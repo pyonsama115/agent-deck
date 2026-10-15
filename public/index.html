@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070912">
+<title>Agent Deck</title>
+<link rel="icon" id="favicon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3160" stop-opacity=".7"/><stop offset="1" stop-color="#2a3160" stop-opacity="0"/></linearGradient>
+</defs></svg>
+<canvas id="sky"></canvas>
+<canvas id="fx"></canvas>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <div class="logo-mark"><span></span><span></span></div>
+      <div><h1>AGENT DECK</h1><small>CLAUDE × CODEX SESSION MONITOR</small></div>
+    </div>
+    <div class="pilot" id="pilot" title="パイロットレベル: エージェントが働くほど上がります">
+      <div class="pilot-lv"><small>PILOT</small><b id="pilotLv">1</b></div>
+      <div class="pilot-xp"><div class="xpbar"><i id="xpFill"></i><span class="shine"></span></div><span id="xpText">0 XP</span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="conn" id="conn"><i></i><span>接続中…</span></div>
+    <button class="btn icon" id="achBtn" title="実績">🏆 <span id="achCount">0</span></button>
+    <button class="btn icon" id="notifyBtn" title="返信待ちをデスクトップ通知">🔕</button>
+    <button class="btn icon" id="soundBtn" title="効果音">🔇</button>
+    <button class="btn icon" id="feedBtn" title="ライブフィード (F)">📡<span class="badge" id="feedBadge" hidden>0</span></button>
+    <button class="btn icon" id="helpBtn" title="ショートカット (?)">⌨️</button>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <section class="stats">
+    <div class="stat" data-k="turns"><span class="ic">✅</span><div><b id="stTurns">0</b><small>今日のターン完了</small></div></div>
+    <div class="stat" data-k="tools"><span class="ic">🔧</span><div><b id="stTools">0</b><small>今日のツール使用</small></div></div>
+    <div class="stat" data-k="subs"><span class="ic">🤖</span><div><b id="stSubs">0</b><small>今日のサブエージェント</small></div></div>
+    <div class="stat combo" data-k="combo" id="comboStat"><span class="ic">🔥</span><div><b id="stCombo">0</b><small>コンボ</small></div></div>
+    <div class="stat chart" title="直近3時間の同時稼働数"><svg id="chart" viewBox="0 0 300 60" preserveAspectRatio="none"></svg><small class="chart-lbl">稼働の推移 (3h) <span class="lg c">■Claude</span> <span class="lg x">■Codex</span></small></div>
+    <div class="stat usage-box" id="usageBox"></div>
+  </section>
+
+  <div class="bar">
+    <div class="filters">
+      <button class="btn" data-filter="all">すべて</button>
+      <button class="btn" data-filter="claude">Claude</button>
+      <button class="btn" data-filter="codex">Codex</button>
+    </div>
+    <label class="search"><span>🔎</span><input id="search" type="search" placeholder="タイトル・プロジェクトで絞り込み ( / )" autocomplete="off"></label>
+    <button class="btn" id="execBtn" title="codex exec などの自動実行セッション">🤖 自動実行</button>
+    <div class="chip ticker" id="ticker" title="クリックでフィードを開く"><span>📡</span><div class="tk" id="tk">セッションの動きを待っています…</div></div>
+  </div>
+
+  <div class="lanes">
+    <section class="lane" data-lane="reply">
+      <div class="lane-head"><div class="ic">🙋</div><div><h2>返信待ち</h2><p>許可・質問、または作業が終わってあなたの返事待ち</p></div><div class="n" id="nReply">0</div></div>
+      <div class="lane-body" id="lane-reply"></div>
+    </section>
+    <section class="lane" data-lane="progress">
+      <div class="lane-head"><div class="ic">⚙️</div><div><h2>進行中</h2><p>いま手を動かしているエージェント</p></div><div class="n" id="nProgress">0</div></div>
+      <div class="lane-body" id="lane-progress"></div>
+    </section>
+    <section class="lane" data-lane="standby">
+      <div class="lane-head"><div class="ic">💤</div><div><h2>待機</h2><p>しばらく動きのないセッション</p></div><div class="n" id="nStandby">0</div></div>
+      <div class="lane-body" id="lane-standby"></div>
+      <div class="lane-foot"><button class="btn" id="endedBtn">終了済みを表示</button></div>
+      <div class="ended-list" id="lane-ended"></div>
+    </section>
+  </div>
+  <footer class="foot-note">ローカルの Claude Code / Codex のログと hooks から表示しています · <a href="?demo=1">デモを見る</a></footer>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="ライブフィード">
+  <div class="drawer-head"><span class="live"></span>LIVE FEED<span class="spacer"></span><button class="btn" data-close="drawer">閉じる</button></div>
+  <ul id="feed"></ul>
+</aside>
+
+<aside class="drawer dpanel" id="detail" aria-label="セッション詳細">
+  <div class="drawer-head"><span id="dTitle">セッション</span><span class="spacer"></span><button class="btn" data-close="detail">閉じる</button></div>
+  <div class="d-stage" id="dStage"></div>
+  <div id="dMeta"></div>
+  <div class="d-actions" id="dActions"></div>
+  <h3>タイムライン</h3>
+  <ol class="timeline" id="dTimeline"></ol>
+</aside>
+
+<div class="modal" id="achModal" hidden>
+  <div class="modal-card">
+    <div class="drawer-head">🏆 実績<span class="spacer"></span><button class="btn" data-close="achModal">閉じる</button></div>
+    <div class="ach-summary" id="achSummary"></div>
+    <div class="ach-grid" id="achGrid"></div>
+  </div>
+</div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-card small">
+    <div class="drawer-head">⌨️ ショートカット<span class="spacer"></span><button class="btn" data-close="helpModal">閉じる</button></div>
+    <dl class="keys">
+      <dt>1 / 2 / 3</dt><dd>すべて / Claude / Codex</dd>
+      <dt>/</dt><dd>検索</dd>
+      <dt>F</dt><dd>ライブフィード</dd>
+      <dt>E</dt><dd>終了済みの表示切替</dd>
+      <dt>X</dt><dd>自動実行セッションの表示切替</dd>
+      <dt>S</dt><dd>効果音 ON/OFF</dd>
+      <dt>A</dt><dd>実績</dd>
+      <dt>Esc</dt><dd>パネルを閉じる</dd>
+    </dl>
+    <p class="hint">カードをクリックすると詳細とタイムラインが開きます。カードの「✓ 完了」でそのセッションを終了済みに移せます（新しい動きがあれば自動で戻ります）。</p>
+  </div>
+</div>
+
+<div id="banner" class="banner" hidden></div>
+<div id="toasts"></div>
+<script src="scenes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

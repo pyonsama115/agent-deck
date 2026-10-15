@@ -1,0 +1,14 @@
+{
+  "name": "agent-deck",
+  "version": "1.0.0",
+  "description": "Claude Code と Codex のセッションを1ページでゲーム感覚で見守るローカルダッシュボード",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "hooks:check": "node install-hooks.js",
+    "hooks:install": "node install-hooks.js --apply",
+    "hooks:remove": "node install-hooks.js --remove"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}

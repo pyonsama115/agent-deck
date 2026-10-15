@@ -1,0 +1,10 @@
+{
+  "name": "Agent Deck",
+  "short_name": "Agent Deck",
+  "description": "Claude Code と Codex のセッションを1ページで見るダッシュボード",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070912",
+  "theme_color": "#070912",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
