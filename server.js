@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { readCodexLimits } = require('./codex-limits');
 
 const PORT = Number(process.env.AGENT_DECK_PORT || 8787);
 const HOST = process.env.AGENT_DECK_HOST || '127.0.0.1';
@@ -548,13 +549,24 @@ function claudeUsage(sessions, now) {
   return { windows, at: smp ? smp.t : null, source: 'デスクトップアプリの記録', reached };
 }
 
+// Codex の使用枠は 10分ごとに app-server から直接取得する (モデルは動かさない・無料)。取れなければログの値を使う
+const CODEX_POLL_MIN = Number(process.env.AGENT_DECK_CODEX_POLL_MIN ?? 10);
+let codexLive = null, codexLiveError = null;
+async function pollCodexLimits() {
+  try { codexLive = await readCodexLimits(); codexLiveError = null; }
+  catch (e) { codexLiveError = e.message; }
+  scheduleTick();
+}
+if (CODEX_POLL_MIN > 0) { setTimeout(pollCodexLimits, 3000); setInterval(pollCodexLimits, CODEX_POLL_MIN * 60e3); }
+
 function codexUsage(sessions) {
   const s = sessions.filter(x => x.agent === 'codex' && x.rate && x.rate.windows.length).sort((a, b) => (b.rate.at || 0) - (a.rate.at || 0))[0];
-  if (!s) return null;
-  const r = s.rate;
+  const live = codexLive && codexLive.windows.length && (!s || codexLive.at >= (s.rate.at || 0));
+  if (!s && !live) return null;
+  const r = live ? codexLive : s.rate;
   return {
     windows: r.windows.map(w => ({ label: windowLabel(w.minutes), minutes: w.minutes, used: w.used, resetsAt: w.resetsAt, at: r.at })),
-    at: r.at, plan: r.plan, source: 'Codex のログ',
+    at: r.at, plan: r.plan, source: live ? `Codex から取得 (${CODEX_POLL_MIN}分ごと)` : 'Codex のログ',
     reached: r.reached ? { label: r.reached, resetsAt: null } : null,
   };
 }

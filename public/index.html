@@ -14,7 +14,7 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3160" stop-opacity=".7"/><stop offset="1" stop-color="#2a3160" stop-opacity="0"/></linearGradient>
+  <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--floor); stop-opacity: .75"/><stop offset="1" style="stop-color: var(--floor); stop-opacity: 0"/></linearGradient>
 </defs></svg>
 <canvas id="sky"></canvas>
 <canvas id="fx"></canvas>
@@ -30,6 +30,7 @@
     </div>
     <div class="spacer"></div>
     <div class="conn" id="conn"><i></i><span>接続中…</span></div>
+    <button class="btn weather" id="weatherBtn" title="天気">☀️ 快晴</button>
     <button class="btn icon tod" id="todBtn" title="表示の時間帯 (T)">🌙</button>
     <button class="btn icon" id="achBtn" title="実績">🏆 <span id="achCount">0</span></button>
     <button class="btn icon" id="notifyBtn" title="返信待ちをデスクトップ通知">🔕</button>

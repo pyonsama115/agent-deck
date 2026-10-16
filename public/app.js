@@ -24,7 +24,7 @@ const ACT_LABEL = {
   error: '💥 エラー', stale: '📡 応答なし', interrupted: '✋ 中断',
 };
 const ACT_ICON = { think: '💭', read: '🔍', edit: '🔨', shell: '⌨️', web: '🌐', browser: '🖱️', plan: '📋', mcp: '⚙️', agent: '🤖' };
-const STATE_COLOR = { working: '#4ade80', waiting: '#ffc531', idle: '#ffc531', error: '#ff4d6d', stale: '#ff4d6d', interrupted: '#ff9f6b', ended: '#555b7a' };
+const STATE_COLOR = { working: 'var(--progress)', waiting: 'var(--reply)', idle: 'var(--reply)', error: 'var(--error)', stale: 'var(--error)', interrupted: 'var(--reply)', ended: 'var(--muted)' };
 const AGENT_COLOR = { claude: '#ff8a4c', codex: '#33e1c9' };
 const AGENT_NAME = { claude: 'Claude', codex: 'Codex' };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -269,6 +269,7 @@ function render() {
   document.title = waitingN ? `(${waitingN}) あなた待ち · Agent Deck` : lanes.reply.length ? `(${lanes.reply.length}) 返信待ち · Agent Deck` : 'Agent Deck';
   setFavicon(waitingN, lanes.reply.length, lanes.progress.length);
   renderUsage();
+  renderWeather();
   if (detailId) renderDetailMeta();
 }
 
@@ -306,13 +307,13 @@ function renderUsage() {
       const used = Math.max(0, Math.min(100, w.used));
       // 3時間以上前の値は今と違う可能性が高いので目印を付ける
       const old = w.at && Date.now() - w.at > 3 * 3600e3;
-      const col = used >= 90 ? 'var(--error)' : used >= 70 ? 'var(--reply)' : AGENT_COLOR[a];
+      const col = used >= 90 ? 'var(--error)' : used >= 70 ? 'var(--reply)' : `var(--${a})`;
       return `<div class="uwin" title="${esc(w.label)}枠: ${Math.round(used)}% 使用 / 残り ${Math.round(100 - used)}%">
         <span class="ul">${esc(w.label)}</span><span class="mbar"><i style="width:${used}%;background:${col}"></i></span>
         <span class="uv${old ? ' old' : ''}">使用 <b>${Math.round(used)}%</b> · 残り ${Math.round(100 - used)}%${old ? `<span class="oldtag">⏳ ${ago(w.at)}の値</span>` : ''}</span>
         ${w.resetsAt ? `<span class="ureset">↻ ${fmtReset(w.resetsAt)}</span>` : ''}</div>`;
     }).join('');
-    return `<div class="ublock"><div class="uhead"><b style="color:${AGENT_COLOR[a]}">${AGENT_NAME[a]}</b>${u.plan ? `<span class="tag">${esc(u.plan)}</span>` : ''}<span class="usrc">${esc(src)}</span></div>${reached}${rows}</div>`;
+    return `<div class="ublock"><div class="uhead"><b style="color:var(--${a})">${AGENT_NAME[a]}</b>${u.plan ? `<span class="tag">${esc(u.plan)}</span>` : ''}<span class="usrc">${esc(src)}</span></div>${reached}${rows}</div>`;
   });
   const html = blocks.length ? blocks.join('') : '<small>使用枠のデータはまだありません</small>';
   if ($('#usageBox').innerHTML !== html) $('#usageBox').innerHTML = html;
@@ -364,19 +365,20 @@ function onTransitions(list) {
     if (firstSnapshot || prev === s.state || prev === undefined) continue;
     const el = cards.get(s.id);
     if (s.state === 'waiting') {
-      toast('🙋', `<b>${esc(s.title)}</b> が${isPermission(s) ? '許可' : '返事'}を待っています`, '#ffc531');
+      toast('🙋', `<b>${esc(s.title)}</b> が${isPermission(s) ? '許可' : '返事'}を待っています`, 'var(--reply)');
       if (el) shockwave(el, '#ffc531');
       sfx.alert();
       desktopNotify(`🙋 ${s.title}`, `${AGENT_NAME[s.agent]} が${isPermission(s) ? '許可' : '返事'}を待っています`);
     } else if (prev === 'working' && s.state === 'idle') {
-      toast('🎉', `<b>${esc(s.title)}</b> のターンが完了！`, AGENT_COLOR[s.agent]);
+      toast('🎉', `<b>${esc(s.title)}</b> のターンが完了！`, `var(--${s.agent})`);
+      if (TOD[currentTod()].night) shootingStar();
       if (el) { el.classList.add('cheer'); setTimeout(() => el.classList.remove('cheer'), 2400); setTimeout(() => confetti(el, s.agent), 400); }
       sfx.done();
       desktopNotify(`🎉 ${s.title}`, `${AGENT_NAME[s.agent]} のターンが完了しました`);
     } else if (s.state === 'working') {
       if (el) setTimeout(() => shockwave(el, '#4ade80'), 600);
     } else if (s.state === 'error' || s.state === 'stale') {
-      toast('💥', `<b>${esc(s.title)}</b> で問題が発生`, '#ff4d6d');
+      toast('💥', `<b>${esc(s.title)}</b> で問題が発生`, 'var(--error)');
       sfx.error();
     }
   }
@@ -419,18 +421,21 @@ function showBanner(big, sub, cls = '') {
 }
 
 function onLevelUp(d) {
+  showRainbow();
   showBanner('LEVEL UP!', `パイロットレベル ${d.level} になりました`);
   $('#pilot').classList.remove('levelup'); void $('#pilot').offsetWidth; $('#pilot').classList.add('levelup');
   fireworks(5);
   sfx.fanfare();
 }
 function onCombo(d) {
+  showRainbow();
   showBanner(`COMBO ×${d.count}`, '連続でターン完了！', 'combo');
   fireworks(Math.min(d.count, 6));
   sfx.combo(d.count);
 }
 function onAchievement(a) {
-  const t = toast(a.icon, `<div><b>実績解除！ ${esc(a.title)}</b><br><small>${esc(a.desc)}</small></div>`, '#ffd166');
+  showRainbow(12000);
+  const t = toast(a.icon, `<div><b>実績解除！ ${esc(a.title)}</b><br><small>${esc(a.desc)}</small></div>`, 'var(--gold)');
   t.classList.add('ach');
   rain(['#ffd166', '#fff3c4', '#ff8a4c', '#33e1c9']);
   sfx.fanfare();
@@ -531,10 +536,10 @@ function fxLoop() {
 
 // ---------- 背景の空 (時間帯で朝・昼・夕方・夜に変わる / 進行中が多いほど流れが速くなる) ----------
 const TOD = {
-  morning: { label: '朝', icon: '🌅', sky: ['#2b2a6b', '#b8648e', '#ffc39b'], neb: [[255, 170, 150], [255, 214, 140]], stars: .25, sun: { x: .18, y: .86, r: 70, c: [255, 196, 120] }, clouds: [255, 200, 210], theme: '#2b2a6b' },
-  day: { label: '昼', icon: '☀️', sky: ['#4ea6ff', '#9fd2ff', '#e8f5ff'], neb: [[255, 255, 255], [180, 230, 255]], stars: 0, sun: { x: .85, y: .12, r: 46, c: [255, 240, 170] }, clouds: [255, 255, 255], theme: '#4ea6ff' },
-  evening: { label: '夕方', icon: '🌇', sky: ['#2a1650', '#b8406a', '#ff9450'], neb: [[255, 120, 90], [180, 90, 200]], stars: .35, sun: { x: .8, y: .84, r: 90, c: [255, 150, 70] }, clouds: [255, 160, 150], theme: '#2a1650' },
-  night: { label: '夜', icon: '🌙', sky: ['#191237', '#0a0d1d', '#05060d'], neb: [[255, 138, 76], [51, 225, 201]], stars: 1, moon: { x: .86, y: .12, r: 22 }, clouds: null, theme: '#070912' },
+  morning: { label: '朝', icon: '🌅', sky: ['#2f2d66', '#7d5a8c', '#d99c88'], neb: [[255, 170, 150], [255, 214, 140]], stars: .2, sun: { x: .16, y: .9, r: 60, c: [255, 200, 140] }, clouds: { hi: [255, 232, 236], lo: [176, 120, 156] }, theme: '#2f2d66' },
+  day: { label: '昼', icon: '☀️', sky: ['#4ea6ff', '#9fd2ff', '#e8f5ff'], neb: [[255, 255, 255], [180, 230, 255]], stars: 0, sun: { x: .85, y: .12, r: 46, c: [255, 240, 170] }, clouds: { hi: [255, 255, 255], lo: [160, 184, 216] }, theme: '#4ea6ff' },
+  evening: { label: '夕方', icon: '🌇', sky: ['#2a1650', '#b8406a', '#ff9450'], neb: [[255, 120, 90], [180, 90, 200]], stars: .35, sun: { x: .8, y: .84, r: 90, c: [255, 150, 70] }, clouds: { hi: [255, 206, 176], lo: [120, 60, 108] }, theme: '#2a1650' },
+  night: { label: '夜', icon: '🌙', sky: ['#191237', '#0a0d1d', '#05060d'], neb: [[255, 138, 76], [51, 225, 201]], stars: 1, moon: { x: .86, y: .12, r: 22 }, clouds: { hi: [104, 110, 150], lo: [26, 28, 56] }, night: true, theme: '#070912' },
 };
 const TOD_ORDER = ['auto', 'morning', 'day', 'evening', 'night'];
 let todPref = TOD_ORDER.includes(pref('tod')) ? pref('tod') : 'auto';
@@ -552,7 +557,7 @@ function applyTod() {
 function cycleTod() {
   todPref = TOD_ORDER[(TOD_ORDER.indexOf(todPref) + 1) % TOD_ORDER.length];
   setPref('tod', todPref); applyTod();
-  toast(TOD[currentTod()].icon, todPref === 'auto' ? `表示を自動にしました (いまは${TOD[currentTod()].label})` : `${TOD[todPref].label}の表示に固定しました`, '#6aa8ff');
+  toast(TOD[currentTod()].icon, todPref === 'auto' ? `表示を自動にしました (いまは${TOD[currentTod()].label})` : `${TOD[todPref].label}の表示に固定しました`, 'var(--codex-2)');
 }
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
@@ -563,20 +568,100 @@ let stars = [], clouds = [];
 function initStars() {
   stars = Array.from({ length: Math.min(400, Math.round(innerWidth * innerHeight / 5000)) }, () => ({
     x: Math.random() * innerWidth, y: Math.random() * innerHeight, z: Math.random() * .9 + .1, tw: Math.random() * 6.28, hue: Math.random() < .5 }));
-  clouds = Array.from({ length: 7 }, () => ({ x: Math.random() * innerWidth, y: innerHeight * (.06 + Math.random() * .5), s: .6 + Math.random() * .9, v: .15 + Math.random() * .3 }));
+  clouds = Array.from({ length: 6 }, (_, i) => newCloud(i, Math.random() * innerWidth));
 }
+// 雲: 小さな綿を何十個もぼかして重ね、下側に影を付けた画像を作って使い回す
+const cloudSprites = new Map();
+function seeded(n) { return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; }; }
+function cloudSprite(col, i) {
+  const key = col.hi.join() + col.lo.join() + i;
+  if (cloudSprites.has(key)) return cloudSprites.get(key);
+  const w = 380, h = 160, c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d'), r = seeded(i * 7919 + 13);
+  x.filter = 'blur(4px)';
+  for (let k = 0; k < 34; k++) {
+    const px = 50 + r() * (w - 100), edge = Math.abs(px - w / 2) / (w / 2);
+    const py = 104 - r() * 50 * (1 - edge * .8), rad = 14 + r() * 30 * (1 - edge * .55);
+    const g = x.createRadialGradient(px, py, 0, px, py, rad);
+    g.addColorStop(0, rgb(col.hi, .95)); g.addColorStop(.55, rgb(col.hi, .7)); g.addColorStop(1, rgb(col.hi, 0));
+    x.fillStyle = g; x.beginPath(); x.arc(px, py, rad, 0, Math.PI * 2); x.fill();
+  }
+  x.filter = 'none';
+  // 底を平らにする
+  x.globalCompositeOperation = 'destination-out';
+  const cut = x.createLinearGradient(0, 106, 0, 132); cut.addColorStop(0, 'rgba(0,0,0,0)'); cut.addColorStop(1, 'rgba(0,0,0,1)');
+  x.fillStyle = cut; x.fillRect(0, 100, w, h);
+  // 下側に影、上側に光
+  x.globalCompositeOperation = 'source-atop';
+  const shade = x.createLinearGradient(0, 40, 0, 125); shade.addColorStop(0, rgb(col.lo, 0)); shade.addColorStop(1, rgb(col.lo, .6));
+  x.fillStyle = shade; x.fillRect(0, 0, w, h);
+  const light = x.createRadialGradient(w * .4, 40, 0, w * .4, 40, w * .45); light.addColorStop(0, 'rgba(255,255,255,.35)'); light.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = light; x.fillRect(0, 0, w, h);
+  cloudSprites.set(key, c);
+  return c;
+}
+function newCloud(i, x) {
+  const far = i % 2 === 0;
+  return { x, far, sprite: i % 4, s: far ? .35 + Math.random() * .25 : .6 + Math.random() * .35,
+    y: innerHeight * (far ? .02 + Math.random() * .18 : .06 + Math.random() * .28), v: far ? .06 + Math.random() * .06 : .14 + Math.random() * .12 };
+}
+// ---------- 天気: エージェントの調子で空模様が変わる ----------
+const WEATHER = {
+  clear: { icon: '☀️', nightIcon: '✨', label: '快晴', cover: .35, nightCover: 0, dark: 0, rain: 0 },
+  cloudy: { icon: '☁️', label: 'くもり', cover: 1, nightCover: .7, dark: .22, rain: 0 },
+  rain: { icon: '🌧️', label: '雨', cover: 1, nightCover: 1, dark: .45, rain: .55 },
+  storm: { icon: '⛈️', label: '雷雨', cover: 1, nightCover: 1, dark: .62, rain: 1 },
+};
+let rainbowUntil = 0;
+function weatherNow() {
+  const now = Date.now();
+  const errs = sessions.filter(s => s.state === 'error' || s.state === 'stale');
+  const waiting = sessions.filter(s => s.state === 'waiting');
+  const longWait = waiting.filter(s => now - (s.stateSince || s.lastActivity) > 3 * 60e3);
+  let maxUsed = 0, maxLabel = '', reached = null;
+  for (const a of ['claude', 'codex']) {
+    const u = usage[a]; if (!u) continue;
+    if (u.reached && (!u.reached.resetsAt || u.reached.resetsAt > now)) reached = `${AGENT_NAME[a]}の${u.reached.label}枠が上限`;
+    for (const w of u.windows || []) if (w.used != null && !(w.at && now - w.at > 3 * 3600e3) && w.used > maxUsed) { maxUsed = w.used; maxLabel = `${AGENT_NAME[a]} ${w.label}枠 ${Math.round(w.used)}%`; }
+  }
+  if (reached || errs.length) return { kind: 'storm', why: reached || `エラーのセッションが ${errs.length} 件` };
+  if (maxUsed >= 80 || longWait.length >= 2) return { kind: 'rain', why: maxUsed >= 80 ? `使用量が多め (${maxLabel})` : `3分以上待たせているセッションが ${longWait.length} 件` };
+  if (waiting.length || maxUsed >= 60) return { kind: 'cloudy', why: waiting.length ? `返事を待っているセッションが ${waiting.length} 件` : `使用量がやや多め (${maxLabel})` };
+  return { kind: 'clear', why: sessions.some(s => s.state === 'working') ? 'みんな順調に作業中' : '穏やかな空' };
+}
+let lastWeather = '';
+function renderWeather() {
+  const w = weatherNow(), def = WEATHER[w.kind], night = TOD[currentTod()].night;
+  const rainbow = Date.now() < rainbowUntil;
+  const btn = $('#weatherBtn');
+  const label = `${w.kind === 'clear' && night ? def.nightIcon : def.icon} ${def.label}${rainbow ? ' 🌈' : ''}`;
+  setText(btn, label);
+  btn.title = `天気: ${def.label} — ${w.why}\nクリックで天気のルールを表示`;
+  btn.dataset.kind = w.kind;
+  // 快晴とくもりは頻繁に入れ替わるので、崩れたときだけ知らせる
+  if (lastWeather && lastWeather !== w.kind && (w.kind === 'rain' || w.kind === 'storm')) toast(def.icon, `天気が「${def.label}」に変わりました — ${esc(w.why)}`, w.kind === 'storm' ? 'var(--error)' : w.kind === 'rain' ? 'var(--codex-2)' : 'var(--gold)');
+  lastWeather = w.kind;
+  return w;
+}
+function showRainbow(ms = 20000) { rainbowUntil = Math.max(rainbowUntil, Date.now() + ms); }
+let meteors = [], drops = [], flash = 0, bolt = null, nextBolt = 0;
+function shootingStar() { if (reduceMotion) return; meteors.push({ x: innerWidth * (.4 + Math.random() * .6), y: innerHeight * Math.random() * .3, life: 1 }); }
+
 let warp = 0.2, pulse = 0;
 function skyLoop(t) {
   const dpr = devicePixelRatio, W = innerWidth, H = innerHeight;
   const P = TOD[currentTod()];
   // 時間帯が切り替わったら色をゆっくり近づける
-  const target = { sky: P.sky.map(hex), neb: P.neb, stars: P.stars, cloud: P.clouds ? 1 : 0 };
+  const W8 = WEATHER[lastWeather || 'clear'];
+  const target = { sky: P.sky.map(hex), neb: P.neb, stars: P.stars, cloud: P.clouds ? (P.night ? W8.nightCover : W8.cover) : 0, dark: W8.dark, rain: W8.rain, bow: Date.now() < rainbowUntil ? 1 : 0 };
   if (!skyNow) skyNow = JSON.parse(JSON.stringify(target));
   const k = reduceMotion ? 1 : .03;
   skyNow.sky = skyNow.sky.map((c, i) => mix(c, target.sky[i], k));
   skyNow.neb = skyNow.neb.map((c, i) => mix(c, target.neb[i], k));
   skyNow.stars += (target.stars - skyNow.stars) * k;
   skyNow.cloud += (target.cloud - skyNow.cloud) * k;
+  for (const key of ['dark', 'rain', 'bow']) skyNow[key] = (skyNow[key] || 0) + (target[key] - (skyNow[key] || 0)) * k;
   const working = sessions.filter(s => s.state === 'working').length;
   const waiting = sessions.some(s => s.state === 'waiting');
   warp += ((reduceMotion ? 0 : 0.25 + Math.min(working, 6) * 0.9) - warp) * 0.02;
@@ -599,22 +684,72 @@ function skyLoop(t) {
     sctx.fillStyle = 'rgba(255,233,168,.9)'; sctx.beginPath(); sctx.arc(mx, my, P.moon.r, 0, Math.PI * 2); sctx.fill();
     sctx.fillStyle = rgb(skyNow.sky[0]); sctx.beginPath(); sctx.arc(mx + P.moon.r * .45, my - P.moon.r * .25, P.moon.r * .85, 0, Math.PI * 2); sctx.fill();
   }
+  if (skyNow.dark > .01) { sctx.fillStyle = `rgba(20,26,44,${skyNow.dark * .55})`; sctx.fillRect(0, 0, W, H); }
+  // 虹
+  if (skyNow.bow > .01) {
+    const cx = W * .3, cy = H * 1.05, R = Math.max(W, H) * .62;
+    ['#ff4d4d', '#ff9f43', '#ffe14d', '#4ade80', '#4dabff', '#6a5cff', '#b06aff'].forEach((c, i) => {
+      sctx.strokeStyle = c; sctx.globalAlpha = .28 * skyNow.bow; sctx.lineWidth = 14;
+      sctx.beginPath(); sctx.arc(cx, cy, R - i * 13, Math.PI * 1.08, Math.PI * 1.92); sctx.stroke();
+    });
+    sctx.globalAlpha = 1;
+  }
   if (pulse > .01) blob(W * .17, H * .35, W * .4, [255, 197, 49], .14 * pulse);
   if (skyNow.stars > .02) for (const s of stars) {
     s.x -= warp * s.z * 1.6;
     if (s.x < -10) { s.x = W + 10; s.y = Math.random() * H; }
     const tw = .5 + Math.sin(t / 700 + s.tw) * .5;
-    const a = (.25 + .6 * tw * s.z) * skyNow.stars;
+    const a = (.25 + .6 * tw * s.z) * skyNow.stars * (1 - skyNow.dark);
     sctx.strokeStyle = s.hue ? `rgba(255,190,150,${a})` : `rgba(160,240,255,${a})`;
     sctx.lineWidth = s.z * 1.6;
     sctx.beginPath(); sctx.moveTo(s.x, s.y); sctx.lineTo(s.x + warp * s.z * 6 + .5, s.y); sctx.stroke();
   }
   // 雲 (朝・昼・夕方)。作業中が多いと速く流れる
-  if (skyNow.cloud > .02 && P.clouds) for (const c of clouds) {
-    c.x -= c.v * (.4 + warp * .5);
-    if (c.x < -260 * c.s) { c.x = W + 200 * c.s; c.y = H * (.06 + Math.random() * .5); }
-    sctx.fillStyle = rgb(P.clouds, .55 * skyNow.cloud);
-    for (const [dx, dy, r] of [[0, 0, 40], [42, -14, 48], [92, 0, 38], [46, 10, 42]]) { sctx.beginPath(); sctx.arc(c.x + dx * c.s, c.y + dy * c.s, r * c.s, 0, Math.PI * 2); sctx.fill(); }
+  if (skyNow.cloud > .02 && P.clouds) {
+    // 遠くの雲から順に描く (遠いほど小さく薄く遅い)
+    const d = Math.round(skyNow.dark * 10) / 10;
+    const col = { hi: mix(P.clouds.hi, [120, 126, 146], d).map(Math.round), lo: mix(P.clouds.lo, [44, 48, 64], d).map(Math.round) };
+    const n = skyNow.cloud * clouds.length;
+    clouds.forEach((c, i) => {
+      c.x -= c.v * (.5 + warp * .35 + skyNow.rain * .8);
+      const img = cloudSprite(col, c.sprite);
+      if (c.x < -img.width * c.s) Object.assign(c, newCloud(i, W + Math.random() * 120));
+      const vis = Math.max(0, Math.min(1, n - i));
+      if (!vis) return;
+      sctx.globalAlpha = (c.far ? .5 : .85) * vis;
+      sctx.drawImage(img, c.x, c.y, img.width * c.s, img.height * c.s);
+    });
+    sctx.globalAlpha = 1;
+  }
+  if (skyNow.rain > .02 && !reduceMotion) {
+    const want = Math.round(260 * skyNow.rain);
+    while (drops.length < want) drops.push({ x: Math.random() * W * 1.2, y: Math.random() * -H, v: 9 + Math.random() * 7, l: 10 + Math.random() * 14 });
+    if (drops.length > want) drops.length = want;
+    sctx.strokeStyle = P.night ? 'rgba(170,190,255,.35)' : 'rgba(225,235,255,.55)'; sctx.lineWidth = 1.1;
+    sctx.beginPath();
+    for (const p of drops) {
+      p.y += p.v; p.x -= p.v * .25;
+      if (p.y > H) { p.y = -20; p.x = Math.random() * W * 1.2; }
+      sctx.moveTo(p.x, p.y); sctx.lineTo(p.x + p.l * .25, p.y - p.l);
+    }
+    sctx.stroke();
+  } else drops.length = 0;
+  if (lastWeather === 'storm' && !reduceMotion && t > nextBolt) {
+    nextBolt = t + 4000 + Math.random() * 6000; flash = 1;
+    let x = W * (.2 + Math.random() * .6), y = 0; bolt = [[x, y]];
+    while (y < H * .55) { y += 20 + Math.random() * 30; x += (Math.random() - .5) * 50; bolt.push([x, y]); }
+  }
+  if (flash > .01) {
+    sctx.fillStyle = `rgba(235,240,255,${flash * .35})`; sctx.fillRect(0, 0, W, H);
+    if (bolt && flash > .5) { sctx.strokeStyle = `rgba(255,255,255,${flash})`; sctx.lineWidth = 2.5; sctx.beginPath(); bolt.forEach(([x, y], i) => i ? sctx.lineTo(x, y) : sctx.moveTo(x, y)); sctx.stroke(); }
+    flash *= .88;
+  }
+  meteors = meteors.filter(m => (m.life -= .015) > 0);
+  for (const m of meteors) {
+    m.x -= 9; m.y += 4;
+    const g2 = sctx.createLinearGradient(m.x, m.y, m.x + 90, m.y - 40);
+    g2.addColorStop(0, `rgba(255,255,255,${m.life})`); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    sctx.strokeStyle = g2; sctx.lineWidth = 2; sctx.beginPath(); sctx.moveTo(m.x, m.y); sctx.lineTo(m.x + 90, m.y - 40); sctx.stroke();
   }
   requestAnimationFrame(skyLoop);
 }
@@ -642,7 +777,7 @@ function eventText(ev) {
   return ev.kind === 'hook' && s ? `${s.title} · ${ev.text}` : ev.text;
 }
 function addFeed(ev, live = true) {
-  const color = ev.kind === 'state' ? (STATE_COLOR[ev.to] || '#8b9cff') : ev.kind === 'achievement' || ev.kind === 'levelup' ? '#ffd166' : AGENT_COLOR[ev.agent];
+  const color = ev.kind === 'state' ? (STATE_COLOR[ev.to] || 'var(--standby)') : ev.kind === 'achievement' || ev.kind === 'levelup' ? 'var(--gold)' : `var(--${ev.agent})`;
   const li = document.createElement('li');
   li.style.setProperty('--c', color);
   if (!live) li.style.animation = 'none';
@@ -736,7 +871,7 @@ async function dismiss(id, undo = false) {
   if (DEMO) { demo.dismiss(id, undo); return; }
   try {
     await fetch('/api/dismiss', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Deck': '1' }, body: JSON.stringify({ id, undo }) });
-  } catch { if (el) el.classList.remove('goodbye'); toast('⚠️', '更新できませんでした', '#ff4d6d'); }
+  } catch { if (el) el.classList.remove('goodbye'); toast('⚠️', '更新できませんでした', 'var(--error)'); }
 }
 
 // ---------- 時計・相対時刻 ----------
@@ -793,19 +928,19 @@ $('#achBtn').onclick = () => openPanel('achModal', true);
 $('#helpBtn').onclick = () => openPanel('helpModal', true);
 $('#soundBtn').onclick = () => { sound = !sound; setPref('sound', sound ? '1' : '0'); paintToggles(); if (sound) sfx.done(); };
 $('#notifyBtn').onclick = async () => {
-  if (!('Notification' in window)) { toast('⚠️', 'このブラウザは通知に対応していません', '#ff4d6d'); return; }
+  if (!('Notification' in window)) { toast('⚠️', 'このブラウザは通知に対応していません', 'var(--error)'); return; }
   if (!notify && Notification.permission !== 'granted') {
     const p = await Notification.requestPermission();
-    if (p !== 'granted') { toast('🔕', '通知が許可されませんでした', '#ff9f6b'); return; }
+    if (p !== 'granted') { toast('🔕', '通知が許可されませんでした', 'var(--reply)'); return; }
   }
   notify = !notify; setPref('notify', notify ? '1' : '0'); paintToggles();
-  toast(notify ? '🔔' : '🔕', notify ? '別の画面にいる時、返信待ち・完了をデスクトップ通知します' : 'デスクトップ通知をオフにしました', '#6aa8ff');
+  toast(notify ? '🔔' : '🔕', notify ? '別の画面にいる時、返信待ち・完了をデスクトップ通知します' : 'デスクトップ通知をオフにしました', 'var(--codex-2)');
 };
 $('#search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
 document.addEventListener('click', e => {
   const c = e.target.closest('[data-close]'); if (c) openPanel(c.dataset.close, false);
   const cp = e.target.closest('[data-copy]');
-  if (cp) navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('📋', 'コピーしました', '#6aa8ff'), () => toast('⚠️', 'コピーできませんでした', '#ff4d6d'));
+  if (cp) navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('📋', 'コピーしました', 'var(--codex-2)'), () => toast('⚠️', 'コピーできませんでした', 'var(--error)'));
   const d = e.target.closest('[data-done]'); if (d) { dismiss(d.dataset.done); openPanel('detail', false); }
   const u = e.target.closest('[data-undo]'); if (u) dismiss(u.dataset.undo, true);
   if (e.target.classList && e.target.classList.contains('modal')) openPanel(e.target.id, false);
@@ -842,6 +977,10 @@ function setDensity(d) {
 $$('#density [data-density]').forEach(b => b.addEventListener('click', () => setDensity(b.dataset.density)));
 setDensity(density);
 $('#todBtn').addEventListener('click', cycleTod);
+$('#weatherBtn').addEventListener('click', () => {
+  const w = weatherNow();
+  toast(WEATHER[w.kind].icon, `<b>いまは「${WEATHER[w.kind].label}」</b> — ${esc(w.why)}<br><small>☀️ 快晴: 順調 / ☁️ くもり: 返信待ちあり・使用量60%超 / 🌧️ 雨: 3分以上の待ちが2件・使用量80%超 / ⛈️ 雷雨: エラー・上限到達 / 🌈 コンボや実績で虹</small>`, 'var(--codex-2)');
+});
 applyTod();
 setInterval(applyTod, 60e3);
 paintToggles();
