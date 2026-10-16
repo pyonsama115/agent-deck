@@ -308,17 +308,19 @@ function renderUsage() {
     const reached = u.reached && (!u.reached.resetsAt || u.reached.resetsAt > Date.now())
       ? `<div class="ureached">⛔ ${esc(u.reached.label)}枠の上限に到達${u.reached.resetsAt ? ` · ${fmtReset(u.reached.resetsAt)} に解除` : ''}</div>` : '';
     const rows = (u.windows || []).map(w => {
-      if (w.used == null) return `<div class="uwin"><span class="ul">${esc(w.label)}</span><span class="uv unknown" title="記録が古く、枠がすでに切り替わっている可能性があります">不明 (記録が古い)</span></div>`;
+      const reset = w.resetsAt && w.resetsAt > Date.now() ? `<span class="ureset" title="${esc(w.resetHow || '')}">↻ ${fmtReset(w.resetsAt)}${w.resetEstimated ? ' <em>推定</em>' : ''}</span>` : '';
+      if (w.used == null) return `<div class="uwin"><span class="ul">${esc(w.label)}</span><span class="uv unknown" title="記録が古く、枠がすでに切り替わっている可能性があります">不明 (${esc(w.note || '記録が古い')})</span>${reset}</div>`;
       const used = Math.max(0, Math.min(100, w.used));
-      // 3時間以上前の値は今と違う可能性が高いので目印を付ける
-      const old = w.at && Date.now() - w.at > 3 * 3600e3;
+      // 20分以上前の値は今と違う可能性があるので目印を付ける
+      const old = w.at && Date.now() - w.at > 20 * 60e3;
       const col = used >= 90 ? 'var(--error)' : used >= 70 ? 'var(--reply)' : `var(--${a})`;
       return `<div class="uwin" title="${esc(w.label)}枠: ${Math.round(used)}% 使用 / 残り ${Math.round(100 - used)}%">
         <span class="ul">${esc(w.label)}</span><span class="mbar"><i style="width:${used}%;background:${col}"></i></span>
         <span class="uv${old ? ' old' : ''}">使用 <b>${Math.round(used)}%</b> · 残り ${Math.round(100 - used)}%${old ? `<span class="oldtag">⏳ ${ago(w.at)}の値</span>` : ''}</span>
-        ${w.resetsAt ? `<span class="ureset">↻ ${fmtReset(w.resetsAt)}</span>` : ''}</div>`;
+        ${reset}</div>`;
     }).join('');
-    return `<div class="ublock"><div class="uhead"><b style="color:var(--${a})">${AGENT_NAME[a]}</b>${u.plan ? `<span class="tag">${esc(u.plan)}</span>` : ''}<span class="usrc">${esc(src)}</span></div>${reached}${rows}</div>`;
+    const hint = u.hint ? `<div class="uhint">💡 ${esc(u.hint)}</div>` : '';
+    return `<div class="ublock"><div class="uhead"><b style="color:var(--${a})">${AGENT_NAME[a]}</b>${u.plan ? `<span class="tag">${esc(u.plan)}</span>` : ''}<span class="usrc${u.stale ? ' stale' : ''}">${u.stale ? '⏳ ' : ''}${esc(src)}</span></div>${reached}${rows}${hint}</div>`;
   });
   const html = blocks.length ? blocks.join('') : '<small>使用枠のデータはまだありません</small>';
   if ($('#usageBox').innerHTML !== html) $('#usageBox').innerHTML = html;

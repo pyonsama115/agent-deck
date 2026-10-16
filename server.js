@@ -526,26 +526,116 @@ function windowLabel(min) {
 // Claude: 使用率はデスクトップアプリが時々書き込む履歴にしかない (fh = 5時間枠 %, sd = 週間枠 %)。
 // 古い値は窓が切り替わっている可能性があるので、5時間枠は5時間、週枠は7日を過ぎたら「不明」にする。
 // 上限に達したときはトランスクリプトに quotaLimits (どの枠か・解除時刻) が残るので、それも使う。
-let planUsage = { mtimeMs: 0, sample: null };
+// ---- Claude の使用枠 ----
+// 使用率はデスクトップアプリが書く plan-usage-history.json だけが頼り (fh = 5時間枠 %, sd = 週枠 %)。
+// リセット時刻は保存されないので、上限に達したときの記録 (トランスクリプトの quotaLimits) と使用率の推移から推定する。
+
+// 過去8日分のトランスクリプトから「上限に到達した記録」を集める。重いので30分ごとに、更新されたファイルだけ読む
+const quotaScan = { at: 0, files: new Map(), running: false, latest: {} };
+async function scanQuotaHistory() {
+  if (quotaScan.running) return;
+  quotaScan.running = true;
+  try {
+    const since = Date.now() - 8 * 86400e3;
+    const root = path.join(CLAUDE_DIR, 'projects');
+    for (const d of safeReaddir(root)) {
+      if (!d.isDirectory()) continue;
+      const dir = path.join(root, d.name);
+      for (const f of safeReaddir(dir)) {
+        if (!f.isFile() || !f.name.endsWith('.jsonl')) continue;
+        const p = path.join(dir, f.name);
+        const st = safeStat(p);
+        if (!st || st.mtimeMs < since) continue;
+        const cached = quotaScan.files.get(p);
+        if (cached && cached.mtimeMs === st.mtimeMs) continue;
+        let text = '';
+        try { text = await fs.promises.readFile(p, 'utf8'); } catch { continue; }
+        const found = [];
+        let i = text.indexOf('"quotaLimits"');
+        while (i >= 0) {
+          const a = text.lastIndexOf('\n', i) + 1, b = text.indexOf('\n', i);
+          try {
+            const o = JSON.parse(text.slice(a, b < 0 ? undefined : b));
+            const q = o.quotaLimits;
+            if (q && q.rateLimitType && q.resetsAt) found.push({ type: q.rateLimitType, resetsAt: q.resetsAt * 1000, at: ts(o) });
+          } catch { }
+          i = text.indexOf('"quotaLimits"', b < 0 ? text.length : b);
+        }
+        quotaScan.files.set(p, { mtimeMs: st.mtimeMs, found });
+      }
+    }
+    const latest = {};
+    for (const { found } of quotaScan.files.values()) for (const q of found) {
+      if (!latest[q.type] || q.at > latest[q.type].at) latest[q.type] = q;
+    }
+    quotaScan.latest = latest;
+    quotaScan.at = Date.now();
+  } finally { quotaScan.running = false; }
+  scheduleTick();
+}
+setTimeout(scanQuotaHistory, 5000);
+setInterval(scanQuotaHistory, 30 * 60e3);
+
+// 週枠のリセット時刻: 上限到達時の記録があればそこから7日刻みで先送り。なければ使用率が大きく下がった時刻を起点に推定
+function weeklyReset(samples, now) {
+  const WEEK = 7 * 86400e3;
+  const roll = t => { while (t <= now) t += WEEK; return t; };
+  const q = quotaScan.latest.seven_day;
+  if (q) return { at: roll(q.resetsAt), estimated: q.resetsAt <= now, how: '上限到達時の記録から' };
+  for (let i = samples.length - 1; i > 0; i--) {
+    const a = samples[i - 1].u, b = samples[i].u;
+    if (a && b && a.sd != null && b.sd != null && b.sd <= 5 && a.sd - b.sd >= 10) {
+      return { at: roll(samples[i].t), estimated: true, how: '使用率が0に戻った時刻から推定' };
+    }
+  }
+  return null;
+}
+
+// 5時間枠のリセット時刻: 上限到達の記録で未来のものがあれば確実。なければ使用率が 0 から上がり始めた時刻 + 5時間 (目安)
+function fiveHourReset(samples, now) {
+  const q = quotaScan.latest.five_hour;
+  if (q && q.resetsAt > now) return { at: q.resetsAt, estimated: false, how: '上限到達時の記録から' };
+  const last = samples[samples.length - 1];
+  if (!last || !last.u || !(last.u.fh > 0) || now - last.t > 5 * 3600e3) return null;
+  for (let i = samples.length - 1; i > 0; i--) {
+    const a = samples[i - 1].u;
+    if (a && samples[i].u && (a.fh === 0 || a.fh > samples[i].u.fh)) {
+      const start = samples[i].t;
+      return start + 5 * 3600e3 > now ? { at: start + 5 * 3600e3, estimated: true, how: '使用率が上がり始めた時刻から推定 (目安)' } : null;
+    }
+  }
+  return null;
+}
+
+let planUsage = { mtimeMs: 0, samples: [] };
 function claudeUsage(sessions, now) {
   const st = safeStat(PLAN_USAGE_FILE);
   if (st && st.mtimeMs !== planUsage.mtimeMs) {
     const o = readJson(PLAN_USAGE_FILE);
-    planUsage = { mtimeMs: st.mtimeMs, sample: o && Array.isArray(o.samples) ? o.samples[o.samples.length - 1] : null };
+    planUsage = { mtimeMs: st.mtimeMs, samples: o && Array.isArray(o.samples) ? o.samples.filter(x => x && x.t && x.u).sort((a, b) => a.t - b.t) : [] };
   }
-  // ステータスラインの値があればそれを優先する (Claude Code が受け取った最新の値)
+  const samples = planUsage.samples;
+  const smp = samples[samples.length - 1] || null;
+  // ステータスラインの値があればそれを優先する (ターミナルの Claude Code が受け取った最新の値)
   const sl = readJson(STATUSLINE_USAGE_FILE);
   const slWin = (w, label, minutes) => w && w.used_percentage != null && !(w.resets_at && w.resets_at * 1000 < now)
     ? { label, minutes, used: w.used_percentage, resetsAt: w.resets_at ? w.resets_at * 1000 : null, at: sl.at } : null;
   const slWindows = sl && sl.rate_limits ? [slWin(sl.rate_limits.five_hour, '5時間', 300), slWin(sl.rate_limits.seven_day, '週', 10080)].filter(Boolean) : [];
-  const smp = planUsage.sample;
   const windows = [];
-  if (slWindows.length && (!smp || sl.at > smp.t)) {
+  const fromSl = slWindows.length > 0 && (!smp || sl.at > smp.t);
+  if (fromSl) {
     windows.push(...slWindows);
-  } else if (smp && smp.u) {
+  } else if (smp) {
     const age = now - smp.t;
-    windows.push({ label: '5時間', minutes: 300, used: age < 5 * 3600e3 ? smp.u.fh : null, at: smp.t });
-    windows.push({ label: '週', minutes: 10080, used: age < 7 * 86400e3 ? smp.u.sd : null, at: smp.t });
+    const r5 = fiveHourReset(samples, now), r7 = weeklyReset(samples, now);
+    // 5時間枠は5時間以上前の値なら窓が切り替わっているので「不明」。ただしリセットを過ぎていれば 0% とみなせる
+    let fh = age < 5 * 3600e3 ? smp.u.fh : null;
+    windows.push({ label: '5時間', minutes: 300, used: fh, at: smp.t, resetsAt: r5 ? r5.at : null, resetEstimated: r5 ? r5.estimated : false, resetHow: r5 ? r5.how : null });
+    // 週枠は、記録のあとでリセットを越えていたら 0% から数え直しになっている
+    const weekRolled = r7 && smp.t < r7.at - 7 * 86400e3;
+    windows.push({ label: '週', minutes: 10080, used: weekRolled ? null : (age < 7 * 86400e3 ? smp.u.sd : null), at: smp.t,
+      resetsAt: r7 ? r7.at : null, resetEstimated: r7 ? r7.estimated : false, resetHow: r7 ? r7.how : null,
+      note: weekRolled ? '記録のあとで週がリセット済み' : null });
   }
   let reached = null;
   for (const s of sessions) {
@@ -555,8 +645,14 @@ function claudeUsage(sessions, now) {
     }
   }
   if (!windows.length && !reached) return null;
-  const fromSl = slWindows.length && windows[0] === slWindows[0];
-  return { windows, at: fromSl ? sl.at : smp ? smp.t : null, source: fromSl ? 'ステータスライン' : 'デスクトップアプリの記録', reached };
+  const at = fromSl ? sl.at : smp ? smp.t : null;
+  return {
+    windows, at, reached,
+    source: fromSl ? 'ステータスライン' : 'デスクトップアプリの記録',
+    // 20分以上更新がなければ「古い」。30分以上止まっていたらトレイを開くよう案内する
+    stale: at ? now - at > 20 * 60e3 : true,
+    hint: !fromSl && (!at || now - at > 30 * 60e3) ? 'タスクトレイの Claude アイコンから使用量を開くと、記録が再開することがあります' : null,
+  };
 }
 
 // Codex の使用枠は 10分ごとに app-server から直接取得する (モデルは動かさない・無料)。取れなければログの値を使う

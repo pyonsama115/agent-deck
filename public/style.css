@@ -689,3 +689,8 @@ body[data-lite] .card:not([data-vis="working"]):not([data-vis="waiting"]) .scene
 body[data-lite] .card:not([data-vis="working"]):not([data-vis="waiting"]) .scene * { animation-play-state: paused !important; }
 body[data-lite] .logo h1, body[data-lite] .xpbar .shine, body[data-lite] .logo-mark span, body[data-lite] .scan { animation: none !important; }
 body[data-lite] .scan { display: none; }
+
+.ureset em { font-style: normal; font-size: 9.5px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 3px; color: var(--muted); }
+.usrc.stale { color: #c9a24a; }
+body[data-tod="day"] .usrc.stale { color: #9a6a00; }
+.uhint { font-size: 10.5px; color: var(--muted); line-height: 1.5; border-top: 1px dashed var(--line); padding-top: 4px; margin-top: 2px; }
