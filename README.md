@@ -94,6 +94,16 @@ node install-hooks.js --remove # 取り除く
 - 既存の hooks や Codex の `notify` には触れません。
 - このフォルダを移動・削除する前に `--remove` で取り除いてください (Codex の hook はこのフォルダのスクリプトを呼びます)。
 
+## Claude の使用枠をリアルタイムにする (任意・ターミナルの Claude Code のみ)
+
+Claude の使用率を公式に取れるのはステータスラインだけです。`~/.claude/settings.json` に次を追加すると、Claude Code が受け取った最新の使用枠が `~/.claude/agent-deck-usage.json` に保存され、ダッシュボードはそれを優先して表示します (モデルは呼ばないので料金・使用枠の消費はありません)。
+
+```json
+"statusLine": { "type": "command", "command": "node \"<このフォルダ>/hooks/claude-statusline.js\"", "refreshInterval": 60 }
+```
+
+注意: Claude デスクトップアプリの Code タブではステータスラインが動かないことを確認しています (2026-10 時点)。ターミナルで `claude` を使う場合だけ有効です。
+
 ## 設定 (環境変数)
 
 | 変数 | 既定値 |
