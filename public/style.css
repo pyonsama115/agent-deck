@@ -508,3 +508,57 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes cheerR { from { transform: rotate(-150deg); } to { transform: rotate(-175deg); } }
 .demo-chip { white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 65; background: linear-gradient(90deg, #ff8a4c, #33e1c9); color: #10131f; font-weight: 900; border-radius: 999px; padding: 6px 16px; font-size: 12px; box-shadow: 0 0 24px rgba(255, 138, 76, .5); }
 .demo-chip a { color: #10131f; }
+
+/* ---------- カードの大きさ切り替え ---------- */
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; padding: 4px 11px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: linear-gradient(90deg, rgba(255, 138, 76, .35), rgba(51, 225, 201, .35)); color: var(--text); }
+
+/* 中: 横長カード。左にロボットを大きめに、右に情報 */
+body[data-density="m"] .lane-body { gap: 10px; }
+body[data-density="m"] .card:not(.compact) { display: grid; grid-template-columns: 150px minmax(0, 1fr); }
+body[data-density="m"] .stage, body[data-density="m"] .card[data-vis="standby"] .stage { height: auto; min-height: 132px; border-bottom: 0; border-right: 1px solid var(--line); }
+body[data-density="m"] .stage .scene { inset: calc(50% - 65px) auto auto -6px; width: 312px; height: 130px; }
+body[data-density="m"] .stage-hud { inset: 6px 6px auto 8px; }
+body[data-density="m"] .stage-hud .act-chip, body[data-density="m"] .stage-hud .stage-timer { display: none; }
+body[data-density="m"] .info { padding: 9px 12px 9px 12px; gap: 3px; justify-content: center; }
+body[data-density="m"] .title { font-size: 14.5px; }
+body[data-density="m"] .bubble, body[data-density="m"] .subline .bots, body[data-density="m"] .tags { display: none; }
+body[data-density="m"] .card[data-vis="yourturn"] .bubble, body[data-density="m"] .card[data-vis="waiting"] .bubble { display: -webkit-box; -webkit-line-clamp: 1; padding: 4px 9px; margin-top: 2px; }
+body[data-density="m"] .foot .compact-act { display: inline; color: color-mix(in srgb, var(--sc) 70%, white); font-weight: 800; white-space: nowrap; }
+body[data-density="m"] .foot .tok { display: none; }
+
+/* 小: 横長の1行カード。左端にロボットだけを見せる */
+body[data-density="s"] .lane-body { gap: 8px; }
+body[data-density="s"] .card:not(.compact) { display: grid; grid-template-columns: 92px minmax(0, 1fr); border-radius: 16px; }
+body[data-density="s"] .stage, body[data-density="s"] .card[data-vis="standby"] .stage { height: auto; min-height: 82px; border-bottom: 0; border-right: 1px solid var(--line); }
+body[data-density="s"] .stage .scene { inset: calc(50% - 41px) auto auto -4px; width: 196px; height: 82px; }
+body[data-density="s"] .stage-hud { display: none; }
+body[data-density="s"] .info { padding: 8px 12px 8px 10px; gap: 2px; justify-content: center; }
+body[data-density="s"] .title { font-size: 13.5px; }
+body[data-density="s"] .bubble, body[data-density="s"] .subline, body[data-density="s"] .meta, body[data-density="s"] .tags { display: none; }
+body[data-density="s"] .detail { font-size: 12px; }
+body[data-density="s"] .foot { margin-top: 2px; }
+body[data-density="s"] .foot > :not(.when):not(.compact-act) { display: none; }
+body[data-density="s"] .foot .compact-act { display: inline; color: color-mix(in srgb, var(--sc) 70%, white); font-weight: 800; }
+.foot .compact-act { display: none; }
+body[data-density="s"] .card-actions .btn { padding: 2px 8px; }
+body[data-density="s"] .lane-head { padding-bottom: 8px; }
+body[data-density="s"] .lane { min-height: 40vh; }
+.state-pill, .agent-tag { white-space: nowrap; }
+@media (max-width: 520px) {
+  body[data-density="m"] .card:not(.compact) { display: block; }
+  body[data-density="m"] .stage, body[data-density="m"] .card[data-vis="standby"] .stage { min-height: 0; height: 128px; border-right: 0; border-bottom: 1px solid var(--line); }
+  body[data-density="m"] .stage .scene { inset: 30px 0 0 0; width: 100%; height: calc(100% - 30px); }
+  body[data-density="m"] .stage-hud .act-chip, body[data-density="m"] .stage-hud .stage-timer { display: inline-block; }
+  body[data-density="m"] .foot .compact-act, body[data-density="m"] .meta { display: none; }
+  body[data-density="s"] .card:not(.compact) { grid-template-columns: 76px minmax(0, 1fr); }
+  body[data-density="s"] .stage, body[data-density="s"] .card[data-vis="standby"] .stage { min-height: 72px; }
+  body[data-density="s"] .stage .scene { top: calc(50% - 35px); width: 168px; height: 70px; }
+  body[data-density="m"] .card-actions, body[data-density="s"] .card-actions { margin-left: 0; }
+}
+
+.subline { flex-wrap: wrap; row-gap: 0; } .subline span { white-space: nowrap; }
+body[data-density="m"] .act-done, body[data-density="s"] .act-done { font-size: 0; padding: 2px 9px; }
+body[data-density="m"] .act-done::before, body[data-density="s"] .act-done::before { content: '✓'; font-size: 12px; }

@@ -36,6 +36,7 @@ let filter = pref('filter') || 'all';
 let search = '';
 let showEnded = pref('showEnded') === '1';
 let showExec = pref('showExec') !== '0';
+let density = ['l', 'm', 's'].includes(pref('density')) ? pref('density') : 'm';
 let sound = pref('sound') === '1';
 let notify = pref('notify') === '1' && 'Notification' in window && Notification.permission === 'granted';
 const prevState = new Map();
@@ -105,7 +106,7 @@ function makeCard(s) {
       <div class="subline" hidden></div>
       <div class="detail"></div>
       <div class="bubble" hidden></div>
-      <div class="foot"><span>ctx</span><div class="ctxbar"><i></i></div><span class="num ctxn">—</span><span class="num tok"></span><span class="when"></span></div>
+      <div class="foot"><span>ctx</span><div class="ctxbar"><i></i></div><span class="num ctxn">—</span><span class="num tok"></span><span class="compact-act"></span><span class="when"></span></div>
     </div>`;
   el.addEventListener('click', e => { if (!e.target.closest('button')) openDetail(s.id); });
   el.addEventListener('keydown', e => { if (e.key === 'Enter') openDetail(s.id); });
@@ -199,8 +200,10 @@ function updateTimers(el) {
   t.hidden = !txt;
   setText(t, txt);
   t.classList.toggle('urgent', vis === 'waiting' && Date.now() - (s.stateSince || s.lastActivity) > 3 * 60e3);
+  setText($('.compact-act', el), [$('.act-chip', el).textContent, txt].filter(Boolean).join('  '));
 }
 
+let noFlip = false;
 // レーンをまたぐ移動も含めて FLIP でなめらかに動かす
 function placeAll(groups) {
   const first = new Map();
@@ -211,7 +214,7 @@ function placeAll(groups) {
       if (container.children[i] !== el) container.insertBefore(el, container.children[i] || null);
     });
   }
-  if (reduceMotion) return;
+  if (reduceMotion || noFlip) return;
   for (const [el, a] of first) {
     if (!el.isConnected) continue;
     const b = el.getBoundingClientRect();
@@ -739,6 +742,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'f') $('#feedBtn').click();
   else if (k === 'e') $('#endedBtn').click();
   else if (k === 'x') $('#execBtn').click();
+  else if (k === 'd') setDensity({ l: 'm', m: 's', s: 'l' }[density]);
   else if (k === 's') $('#soundBtn').click();
   else if (k === 'a') openPanel('achModal', $('#achModal').hidden);
   else if (k === '?') openPanel('helpModal', true);
@@ -748,6 +752,16 @@ addEventListener('resize', () => { sizeCanvas(sky); sizeCanvas(fx); initStars();
 sizeCanvas(sky); sizeCanvas(fx); initStars();
 requestAnimationFrame(skyLoop); requestAnimationFrame(fxLoop);
 setFilter(filter);
+// カードの大きさ: l = 大 (舞台を大きく), m = 中, s = 小 (1行)
+function setDensity(d) {
+  density = d; setPref('density', d);
+  document.body.dataset.density = d;
+  $$('[data-density]', $('#density')).forEach(b => b.classList.toggle('on', b.dataset.density === d));
+  // 並びが大きく変わるのでカードの移動アニメーションは出さずに配置し直す
+  noFlip = true; render(); noFlip = false;
+}
+$$('#density [data-density]').forEach(b => b.addEventListener('click', () => setDensity(b.dataset.density)));
+setDensity(density);
 paintToggles();
 setInterval(tickClock, 1000); tickClock();
 if (DEMO) {
