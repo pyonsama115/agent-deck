@@ -15,6 +15,8 @@ const CODEX_DIR = process.env.CODEX_HOME || path.join(HOME, '.codex');
 const APPDATA_CLAUDE = path.join(process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming'), 'Claude');
 const DESKTOP_META_DIR = path.join(APPDATA_CLAUDE, 'claude-code-sessions');
 const PLAN_USAGE_FILE = path.join(APPDATA_CLAUDE, 'plan-usage-history.json');
+// ステータスライン (hooks/claude-statusline.js) が保存する最新の使用枠
+const STATUSLINE_USAGE_FILE = path.join(CLAUDE_DIR, 'agent-deck-usage.json');
 const RECENT_MS = Number(process.env.AGENT_DECK_RECENT_HOURS || 12) * 3600e3;
 const POLL_MS = 2000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -531,9 +533,16 @@ function claudeUsage(sessions, now) {
     const o = readJson(PLAN_USAGE_FILE);
     planUsage = { mtimeMs: st.mtimeMs, sample: o && Array.isArray(o.samples) ? o.samples[o.samples.length - 1] : null };
   }
+  // ステータスラインの値があればそれを優先する (Claude Code が受け取った最新の値)
+  const sl = readJson(STATUSLINE_USAGE_FILE);
+  const slWin = (w, label, minutes) => w && w.used_percentage != null && !(w.resets_at && w.resets_at * 1000 < now)
+    ? { label, minutes, used: w.used_percentage, resetsAt: w.resets_at ? w.resets_at * 1000 : null, at: sl.at } : null;
+  const slWindows = sl && sl.rate_limits ? [slWin(sl.rate_limits.five_hour, '5時間', 300), slWin(sl.rate_limits.seven_day, '週', 10080)].filter(Boolean) : [];
   const smp = planUsage.sample;
   const windows = [];
-  if (smp && smp.u) {
+  if (slWindows.length && (!smp || sl.at > smp.t)) {
+    windows.push(...slWindows);
+  } else if (smp && smp.u) {
     const age = now - smp.t;
     windows.push({ label: '5時間', minutes: 300, used: age < 5 * 3600e3 ? smp.u.fh : null, at: smp.t });
     windows.push({ label: '週', minutes: 10080, used: age < 7 * 86400e3 ? smp.u.sd : null, at: smp.t });
@@ -546,7 +555,8 @@ function claudeUsage(sessions, now) {
     }
   }
   if (!windows.length && !reached) return null;
-  return { windows, at: smp ? smp.t : null, source: 'デスクトップアプリの記録', reached };
+  const fromSl = slWindows.length && windows[0] === slWindows[0];
+  return { windows, at: fromSl ? sl.at : smp ? smp.t : null, source: fromSl ? 'ステータスライン' : 'デスクトップアプリの記録', reached };
 }
 
 // Codex の使用枠は 10分ごとに app-server から直接取得する (モデルは動かさない・無料)。取れなければログの値を使う
