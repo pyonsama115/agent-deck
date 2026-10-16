@@ -17,6 +17,10 @@ node server.js
 
 ブラウザで http://127.0.0.1:8787 を開きます。Windows なら `start.cmd` をダブルクリックでも起動できます。
 
+### 裏で動かし続ける (Windows)
+
+`start-background.cmd` をダブルクリックすると、画面を出さずに裏で起動します。`daemon.js` がサーバーを見張り、落ちても2秒ほどで自動的に立ち上げ直します。止めるときは `stop-background.cmd`。ログは `data/agent-deck.log` に残ります。
+
 架空のデータで全部の演出を見るには http://127.0.0.1:8787/?demo=1 を開いてください。
 
 ## 画面
