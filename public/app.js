@@ -38,6 +38,7 @@ let showEnded = pref('showEnded') === '1';
 let showExec = pref('showExec') !== '0';
 let density = ['l', 'm', 's'].includes(pref('density')) ? pref('density') : 'm';
 let sound = pref('sound') === '1';
+let lite = pref('lite') === '1';
 let notify = pref('notify') === '1' && 'Notification' in window && Notification.permission === 'granted';
 const prevState = new Map();
 let firstSnapshot = true;
@@ -84,6 +85,9 @@ function actLabel(s, vis, scene) {
 
 // ---------- カード ----------
 const cards = new Map();
+const offscreenObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+  for (const e of entries) e.target.classList.toggle('offscreen', !e.isIntersecting);
+}, { rootMargin: '120px' }) : null;
 
 function makeCard(s) {
   const el = document.createElement('div');
@@ -112,6 +116,7 @@ function makeCard(s) {
   el.addEventListener('keydown', e => { if (e.key === 'Enter') openDetail(s.id); });
   $('.act-done', el).addEventListener('click', e => { e.stopPropagation(); dismiss(s.id); });
   el._kind = 'full';
+  if (offscreenObserver) offscreenObserver.observe(el);
   return el;
 }
 
@@ -482,7 +487,10 @@ const sfx = {
 // ---------- パーティクル (紙吹雪・花火・衝撃波) ----------
 const fx = $('#fx'), fctx = fx.getContext('2d');
 let parts = [], rings = [];
-function sizeCanvas(c) { c.width = innerWidth * devicePixelRatio; c.height = innerHeight * devicePixelRatio; c.style.width = innerWidth + 'px'; c.style.height = innerHeight + 'px'; }
+const FX_DPR = () => Math.min(devicePixelRatio, 1.25);
+function sizeCanvas(c) { c.width = innerWidth * FX_DPR(); c.height = innerHeight * FX_DPR(); c.style.width = innerWidth + 'px'; c.style.height = innerHeight + 'px'; }
+let fxRunning = false;
+function startFx() { if (!fxRunning) { fxRunning = true; requestAnimationFrame(fxLoop); } }
 function botCenter(el) { const r = ($('.stage', el) || el).getBoundingClientRect(); return { x: r.left + r.width * .22, y: r.top + r.height * .55 }; }
 function burst(x, y, cols, n, power = 12, shape = 'rect') {
   if (reduceMotion) return;
@@ -491,27 +499,29 @@ function burst(x, y, cols, n, power = 12, shape = 'rect') {
     parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - power * .4, g: .3, life: 70 + Math.random() * 50, rot: Math.random() * 6, vr: (Math.random() - .5) * .4,
       w: 4 + Math.random() * 5, h: 3 + Math.random() * 4, c: cols[i % cols.length], shape });
   }
+  startFx();
 }
 function confetti(el, agent) {
   const c = botCenter(el);
   burst(c.x, c.y - 20, agent === 'claude' ? ['#ff8a4c', '#ffb26b', '#fff2e8', '#ffd166'] : ['#33e1c9', '#6aa8ff', '#eafffb', '#b388ff'], 90, 13);
 }
 function coinBurst(el, n) { const c = botCenter(el); burst(c.x, c.y - 30, ['#ffd166', '#ffe9a8'], n, 7, 'coin'); }
-function shockwave(el, color) { if (reduceMotion) return; const c = botCenter(el); rings.push({ x: c.x, y: c.y, r: 10, a: 1, c: color }); }
+function shockwave(el, color) { if (reduceMotion) return; const c = botCenter(el); rings.push({ x: c.x, y: c.y, r: 10, a: 1, c: color }); startFx(); }
 function fireworks(n) {
   for (let i = 0; i < n; i++) setTimeout(() => {
     const x = innerWidth * (.2 + Math.random() * .6), y = innerHeight * (.15 + Math.random() * .35);
     burst(x, y, [['#ff8a4c', '#ffd166'], ['#33e1c9', '#6aa8ff'], ['#b388ff', '#ff4d6d']][i % 3].concat('#fff'), 70, 9, 'spark');
-    rings.push({ x, y, r: 6, a: 1, c: '#ffd166' });
+    rings.push({ x, y, r: 6, a: 1, c: '#ffd166' }); startFx();
   }, i * 260);
 }
 function rain(cols) {
   if (reduceMotion) return;
   for (let i = 0; i < 120; i++) parts.push({ x: Math.random() * innerWidth, y: -20 - Math.random() * 200, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 3, g: .05,
     life: 200, rot: Math.random() * 6, vr: (Math.random() - .5) * .3, w: 6, h: 4, c: cols[i % cols.length], shape: 'rect' });
+  startFx();
 }
 function fxLoop() {
-  const dpr = devicePixelRatio;
+  const dpr = FX_DPR();
   fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   fctx.clearRect(0, 0, innerWidth, innerHeight);
   parts = parts.filter(p => p.life-- > 0 && p.y < innerHeight + 40);
@@ -531,6 +541,7 @@ function fxLoop() {
     fctx.beginPath(); fctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); fctx.stroke();
   }
   fctx.globalAlpha = 1;
+  if (!parts.length && !rings.length) { fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, fx.width, fx.height); fxRunning = false; return; }
   requestAnimationFrame(fxLoop);
 }
 
@@ -649,14 +660,54 @@ let meteors = [], drops = [], flash = 0, bolt = null, nextBolt = 0;
 function shootingStar() { if (reduceMotion) return; meteors.push({ x: innerWidth * (.4 + Math.random() * .6), y: innerHeight * Math.random() * .3, life: 1 }); }
 
 let warp = 0.2, pulse = 0;
+// 背景は「ほぼ動かない層 (空の色・太陽/月・暗さ・虹)」を別キャンバスに 0.5秒ごとに描いて使い回し、
+// 毎フレームは星・雲・雨などの動く物だけを描く。解像度も控えめにして GPU の負担を減らす。
+const SKY_SCALE = () => Math.min(devicePixelRatio, 1) * (lite ? .5 : .75);
+const skyBase = document.createElement('canvas'), bctx = skyBase.getContext('2d');
+let baseAt = 0, liteFrame = 0;
+function drawBase(t, P, W, H) {
+  const sc = SKY_SCALE() * .5;
+  if (skyBase.width !== Math.round(W * sc) || skyBase.height !== Math.round(H * sc)) { skyBase.width = Math.round(W * sc); skyBase.height = Math.round(H * sc); }
+  bctx.setTransform(sc, 0, 0, sc, 0, 0);
+  const g = bctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, rgb(skyNow.sky[0])); g.addColorStop(.55, rgb(skyNow.sky[1])); g.addColorStop(1, rgb(skyNow.sky[2]));
+  bctx.fillStyle = g; bctx.fillRect(0, 0, W, H);
+  const blob = (x, y, r, c, a) => { const rg = bctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, rgb(c, a)); rg.addColorStop(1, rgb(c, 0)); bctx.fillStyle = rg; bctx.fillRect(x - r, y - r, r * 2, r * 2); };
+  blob(W * (.15 + Math.sin(t / 9000) * .05), H * .25, W * .4, skyNow.neb[0], .10);
+  blob(W * (.85 + Math.cos(t / 11000) * .05), H * .7, W * .45, skyNow.neb[1], .09);
+  if (P.sun) {
+    const sx = W * P.sun.x, sy = H * P.sun.y + Math.sin(t / 5000) * 4;
+    blob(sx, sy, P.sun.r * 4, P.sun.c, .35);
+    bctx.fillStyle = rgb(P.sun.c, .95); bctx.beginPath(); bctx.arc(sx, sy, P.sun.r, 0, Math.PI * 2); bctx.fill();
+  } else if (P.moon) {
+    const mx = W * P.moon.x, my = H * P.moon.y;
+    blob(mx, my, P.moon.r * 5, [255, 233, 168], .12);
+    bctx.fillStyle = 'rgba(255,233,168,.9)'; bctx.beginPath(); bctx.arc(mx, my, P.moon.r, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = rgb(skyNow.sky[0]); bctx.beginPath(); bctx.arc(mx + P.moon.r * .45, my - P.moon.r * .25, P.moon.r * .85, 0, Math.PI * 2); bctx.fill();
+  }
+  if (skyNow.dark > .01) { bctx.fillStyle = `rgba(20,26,44,${skyNow.dark * .55})`; bctx.fillRect(0, 0, W, H); }
+  if (skyNow.bow > .01) {
+    const cx = W * .3, cy = H * 1.05, R = Math.max(W, H) * .62;
+    ['#ff4d4d', '#ff9f43', '#ffe14d', '#4ade80', '#4dabff', '#6a5cff', '#b06aff'].forEach((c, i) => {
+      bctx.strokeStyle = c; bctx.globalAlpha = .28 * skyNow.bow; bctx.lineWidth = 14;
+      bctx.beginPath(); bctx.arc(cx, cy, R - i * 13, Math.PI * 1.08, Math.PI * 1.92); bctx.stroke();
+    });
+    bctx.globalAlpha = 1;
+  }
+}
+
 function skyLoop(t) {
-  const dpr = devicePixelRatio, W = innerWidth, H = innerHeight;
+  requestAnimationFrame(skyLoop);
+  // 軽量モードは 15fps 程度に間引く
+  if (lite && (++liteFrame % 4)) return;
+  const W = innerWidth, H = innerHeight, sc = SKY_SCALE();
+  if (sky.width !== Math.round(W * sc) || sky.height !== Math.round(H * sc)) { sky.width = Math.round(W * sc); sky.height = Math.round(H * sc); sky.style.width = W + 'px'; sky.style.height = H + 'px'; }
   const P = TOD[currentTod()];
-  // 時間帯が切り替わったら色をゆっくり近づける
+  // 時間帯・天気が切り替わったら色をゆっくり近づける
   const W8 = WEATHER[lastWeather || 'clear'];
   const target = { sky: P.sky.map(hex), neb: P.neb, stars: P.stars, cloud: P.clouds ? (P.night ? W8.nightCover : W8.cover) : 0, dark: W8.dark, rain: W8.rain, bow: Date.now() < rainbowUntil ? 1 : 0 };
-  if (!skyNow) skyNow = JSON.parse(JSON.stringify(target));
-  const k = reduceMotion ? 1 : .03;
+  if (!skyNow) { skyNow = JSON.parse(JSON.stringify(target)); baseAt = 0; }
+  const k = reduceMotion ? 1 : lite ? .12 : .03;
   skyNow.sky = skyNow.sky.map((c, i) => mix(c, target.sky[i], k));
   skyNow.neb = skyNow.neb.map((c, i) => mix(c, target.neb[i], k));
   skyNow.stars += (target.stars - skyNow.stars) * k;
@@ -664,54 +715,37 @@ function skyLoop(t) {
   for (const key of ['dark', 'rain', 'bow']) skyNow[key] = (skyNow[key] || 0) + (target[key] - (skyNow[key] || 0)) * k;
   const working = sessions.filter(s => s.state === 'working').length;
   const waiting = sessions.some(s => s.state === 'waiting');
-  warp += ((reduceMotion ? 0 : 0.25 + Math.min(working, 6) * 0.9) - warp) * 0.02;
+  warp += ((reduceMotion || lite ? 0 : 0.25 + Math.min(working, 6) * 0.9) - warp) * 0.02;
   pulse = waiting ? (Math.sin(t / 400) + 1) / 2 : pulse * .95;
-  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const g = sctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, rgb(skyNow.sky[0])); g.addColorStop(.55, rgb(skyNow.sky[1])); g.addColorStop(1, rgb(skyNow.sky[2]));
-  sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
-  const blob = (x, y, r, c, a) => { const rg = sctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, rgb(c, a)); rg.addColorStop(1, rgb(c, 0)); sctx.fillStyle = rg; sctx.fillRect(0, 0, W, H); };
-  blob(W * (.15 + Math.sin(t / 9000) * .05), H * .25, W * .4, skyNow.neb[0], .10);
-  blob(W * (.85 + Math.cos(t / 11000) * .05), H * .7, W * .45, skyNow.neb[1], .09);
-  // 太陽・月
-  if (P.sun) {
-    const sx = W * P.sun.x, sy = H * P.sun.y + Math.sin(t / 5000) * 4;
-    blob(sx, sy, P.sun.r * 4, P.sun.c, .35);
-    sctx.fillStyle = rgb(P.sun.c, .95); sctx.beginPath(); sctx.arc(sx, sy, P.sun.r, 0, Math.PI * 2); sctx.fill();
-  } else if (P.moon) {
-    const mx = W * P.moon.x, my = H * P.moon.y;
-    blob(mx, my, P.moon.r * 5, [255, 233, 168], .12);
-    sctx.fillStyle = 'rgba(255,233,168,.9)'; sctx.beginPath(); sctx.arc(mx, my, P.moon.r, 0, Math.PI * 2); sctx.fill();
-    sctx.fillStyle = rgb(skyNow.sky[0]); sctx.beginPath(); sctx.arc(mx + P.moon.r * .45, my - P.moon.r * .25, P.moon.r * .85, 0, Math.PI * 2); sctx.fill();
+  if (t - baseAt > 500) { drawBase(t, P, W, H); baseAt = t; }
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.drawImage(skyBase, 0, 0, sky.width, sky.height);
+  sctx.setTransform(sc, 0, 0, sc, 0, 0);
+  if (pulse > .01) { const rg = sctx.createRadialGradient(W * .17, H * .35, 0, W * .17, H * .35, W * .4); rg.addColorStop(0, `rgba(255,197,49,${.14 * pulse})`); rg.addColorStop(1, 'rgba(255,197,49,0)'); sctx.fillStyle = rg; sctx.fillRect(0, 0, W, H); }
+  if (skyNow.stars > .02) {
+    // 星は明るさを4段階にまとめて、色ごとに1回で描く
+    const fade = skyNow.stars * (1 - skyNow.dark);
+    for (const hue of [true, false]) for (let b = 0; b < 4; b++) {
+      sctx.strokeStyle = hue ? `rgba(255,190,150,${(.3 + b * .2) * fade})` : `rgba(160,240,255,${(.3 + b * .2) * fade})`;
+      sctx.lineWidth = 1 + b * .3;
+      sctx.beginPath();
+      for (const s of stars) {
+        if (s.hue !== hue) continue;
+        const tw = .5 + Math.sin(t / 700 + s.tw) * .5;
+        if (Math.min(3, Math.floor(tw * s.z * 4)) !== b) continue;
+        sctx.moveTo(s.x, s.y); sctx.lineTo(s.x + warp * s.z * 6 + .5, s.y);
+      }
+      sctx.stroke();
+    }
+    for (const s of stars) { s.x -= warp * s.z * 1.6; if (s.x < -10) { s.x = W + 10; s.y = Math.random() * H; } }
   }
-  if (skyNow.dark > .01) { sctx.fillStyle = `rgba(20,26,44,${skyNow.dark * .55})`; sctx.fillRect(0, 0, W, H); }
-  // 虹
-  if (skyNow.bow > .01) {
-    const cx = W * .3, cy = H * 1.05, R = Math.max(W, H) * .62;
-    ['#ff4d4d', '#ff9f43', '#ffe14d', '#4ade80', '#4dabff', '#6a5cff', '#b06aff'].forEach((c, i) => {
-      sctx.strokeStyle = c; sctx.globalAlpha = .28 * skyNow.bow; sctx.lineWidth = 14;
-      sctx.beginPath(); sctx.arc(cx, cy, R - i * 13, Math.PI * 1.08, Math.PI * 1.92); sctx.stroke();
-    });
-    sctx.globalAlpha = 1;
-  }
-  if (pulse > .01) blob(W * .17, H * .35, W * .4, [255, 197, 49], .14 * pulse);
-  if (skyNow.stars > .02) for (const s of stars) {
-    s.x -= warp * s.z * 1.6;
-    if (s.x < -10) { s.x = W + 10; s.y = Math.random() * H; }
-    const tw = .5 + Math.sin(t / 700 + s.tw) * .5;
-    const a = (.25 + .6 * tw * s.z) * skyNow.stars * (1 - skyNow.dark);
-    sctx.strokeStyle = s.hue ? `rgba(255,190,150,${a})` : `rgba(160,240,255,${a})`;
-    sctx.lineWidth = s.z * 1.6;
-    sctx.beginPath(); sctx.moveTo(s.x, s.y); sctx.lineTo(s.x + warp * s.z * 6 + .5, s.y); sctx.stroke();
-  }
-  // 雲 (朝・昼・夕方)。作業中が多いと速く流れる
+  // 雲 (遠くの雲ほど小さく薄く遅い)。作業中が多いと速く流れる
   if (skyNow.cloud > .02 && P.clouds) {
-    // 遠くの雲から順に描く (遠いほど小さく薄く遅い)
     const d = Math.round(skyNow.dark * 10) / 10;
     const col = { hi: mix(P.clouds.hi, [120, 126, 146], d).map(Math.round), lo: mix(P.clouds.lo, [44, 48, 64], d).map(Math.round) };
     const n = skyNow.cloud * clouds.length;
     clouds.forEach((c, i) => {
-      c.x -= c.v * (.5 + warp * .35 + skyNow.rain * .8);
+      c.x -= c.v * (.5 + warp * .35 + skyNow.rain * .8) * (lite ? 4 : 1);
       const img = cloudSprite(col, c.sprite);
       if (c.x < -img.width * c.s) Object.assign(c, newCloud(i, W + Math.random() * 120));
       const vis = Math.max(0, Math.min(1, n - i));
@@ -722,19 +756,19 @@ function skyLoop(t) {
     sctx.globalAlpha = 1;
   }
   if (skyNow.rain > .02 && !reduceMotion) {
-    const want = Math.round(260 * skyNow.rain);
+    const want = Math.round((lite ? 90 : 220) * skyNow.rain);
     while (drops.length < want) drops.push({ x: Math.random() * W * 1.2, y: Math.random() * -H, v: 9 + Math.random() * 7, l: 10 + Math.random() * 14 });
     if (drops.length > want) drops.length = want;
     sctx.strokeStyle = P.night ? 'rgba(170,190,255,.35)' : 'rgba(225,235,255,.55)'; sctx.lineWidth = 1.1;
     sctx.beginPath();
     for (const p of drops) {
-      p.y += p.v; p.x -= p.v * .25;
+      p.y += p.v * (lite ? 4 : 1); p.x -= p.v * .25 * (lite ? 4 : 1);
       if (p.y > H) { p.y = -20; p.x = Math.random() * W * 1.2; }
       sctx.moveTo(p.x, p.y); sctx.lineTo(p.x + p.l * .25, p.y - p.l);
     }
     sctx.stroke();
   } else drops.length = 0;
-  if (lastWeather === 'storm' && !reduceMotion && t > nextBolt) {
+  if (lastWeather === 'storm' && !reduceMotion && !lite && t > nextBolt) {
     nextBolt = t + 4000 + Math.random() * 6000; flash = 1;
     let x = W * (.2 + Math.random() * .6), y = 0; bolt = [[x, y]];
     while (y < H * .55) { y += 20 + Math.random() * 30; x += (Math.random() - .5) * 50; bolt.push([x, y]); }
@@ -751,7 +785,6 @@ function skyLoop(t) {
     g2.addColorStop(0, `rgba(255,255,255,${m.life})`); g2.addColorStop(1, 'rgba(255,255,255,0)');
     sctx.strokeStyle = g2; sctx.lineWidth = 2; sctx.beginPath(); sctx.moveTo(m.x, m.y); sctx.lineTo(m.x + 90, m.y - 40); sctx.stroke();
   }
-  requestAnimationFrame(skyLoop);
 }
 
 // ---------- ファビコン (返信待ちの数をバッジで表示) ----------
@@ -956,6 +989,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'e') $('#endedBtn').click();
   else if (k === 'x') $('#execBtn').click();
   else if (k === 't') cycleTod();
+  else if (k === 'l') setLite(!lite, true);
   else if (k === 'd') setDensity({ l: 'm', m: 's', s: 'l' }[density]);
   else if (k === 's') $('#soundBtn').click();
   else if (k === 'a') openPanel('achModal', $('#achModal').hidden);
@@ -964,7 +998,7 @@ document.addEventListener('keydown', e => {
 
 addEventListener('resize', () => { sizeCanvas(sky); sizeCanvas(fx); initStars(); });
 sizeCanvas(sky); sizeCanvas(fx); initStars();
-requestAnimationFrame(skyLoop); requestAnimationFrame(fxLoop);
+requestAnimationFrame(skyLoop);
 setFilter(filter);
 // カードの大きさ: l = 大 (舞台を大きく), m = 中, s = 小 (1行)
 function setDensity(d) {
@@ -977,6 +1011,16 @@ function setDensity(d) {
 $$('#density [data-density]').forEach(b => b.addEventListener('click', () => setDensity(b.dataset.density)));
 setDensity(density);
 $('#todBtn').addEventListener('click', cycleTod);
+function setLite(on, announce) {
+  lite = on; setPref('lite', on ? '1' : '0');
+  document.body.toggleAttribute('data-lite', on);
+  $('#liteBtn').classList.toggle('on', on);
+  $('#liteBtn').title = on ? '軽量モード: ON — 背景を間引き、待機中のロボットを止めています (L)' : '軽量モード: OFF (L)';
+  skyNow = null;
+  if (announce) toast(on ? '🪶' : '✨', on ? '軽量モードにしました (背景を間引き、待機中のロボットを停止)' : '通常モードに戻しました', 'var(--codex-2)');
+}
+$('#liteBtn').addEventListener('click', () => setLite(!lite, true));
+setLite(lite, false);
 $('#weatherBtn').addEventListener('click', () => {
   const w = weatherNow();
   toast(WEATHER[w.kind].icon, `<b>いまは「${WEATHER[w.kind].label}」</b> — ${esc(w.why)}<br><small>☀️ 快晴: 順調 / ☁️ くもり: 返信待ちあり・使用量60%超 / 🌧️ 雨: 3分以上の待ちが2件・使用量80%超 / ⛈️ 雷雨: エラー・上限到達 / 🌈 コンボや実績で虹</small>`, 'var(--codex-2)');

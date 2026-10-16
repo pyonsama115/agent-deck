@@ -127,10 +127,13 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .lane { --lc: var(--standby); position: relative; border-radius: 22px; padding: 12px; min-height: 60vh;
   background: linear-gradient(180deg, color-mix(in srgb, var(--lc) 10%, var(--lane-a)), var(--lane-b) 40%);
-  border: 1px solid color-mix(in srgb, var(--lc) 26%, transparent); backdrop-filter: blur(8px); }
+  border: 1px solid color-mix(in srgb, var(--lc) 26%, transparent); }
 .lane[data-lane="reply"] { --lc: var(--reply); }
 .lane[data-lane="progress"] { --lc: var(--progress); }
-.lane.hot { animation: laneHot 1.6s ease-in-out infinite; }
+.lane::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+  border: 1px solid color-mix(in srgb, var(--reply) 75%, transparent); box-shadow: 0 0 44px -6px color-mix(in srgb, var(--reply) 60%, transparent); }
+.lane.hot::after { animation: hotFade 1.6s ease-in-out infinite; }
+@keyframes hotFade { 50% { opacity: 1; } }
 @keyframes laneHot { 50% { box-shadow: 0 0 44px -6px color-mix(in srgb, var(--reply) 60%, transparent); border-color: color-mix(in srgb, var(--reply) 75%, transparent); } }
 .lane-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; }
 .lane-head .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; flex: none;
@@ -245,7 +248,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
 @keyframes shadowHop { 40% { transform: scale(.7); opacity: .5; } }
 @keyframes wave { from { transform: rotate(-150deg); } to { transform: rotate(-185deg); } }
-@keyframes antGlow { to { filter: drop-shadow(0 0 5px #fff); transform: scale(1.35); } }
+@keyframes antGlow { to { transform: scale(1.35); opacity: .75; } }
 @keyframes flicker { 50% { opacity: .5; } }
 @keyframes pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15) rotate(5deg); } }
 @keyframes floatUp { 0% { opacity: 0; transform: translateY(6px); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
@@ -262,7 +265,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-think .g2 { transform-origin: 50% 50%; animation: spin 2s linear infinite reverse; }
 .s-think .g3 { transform-origin: 50% 50%; animation: spin 1.6s linear infinite; }
 .s-think .bulb { animation: bulb 3s steps(1) infinite; }
-@keyframes bulb { 0%, 60% { opacity: .25; } 62%, 100% { opacity: 1; filter: drop-shadow(0 0 6px #ffd166); } }
+@keyframes bulb { 0%, 60% { opacity: .25; } 62%, 100% { opacity: 1; } }
 .s-think .qmark { animation: floaty 2s ease-in-out infinite; }
 
 /* 読んでいる */
@@ -364,7 +367,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-waiting .sign { transform-origin: 50% 100%; animation: signWobble 1.6s ease-in-out infinite; }
 @keyframes signWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 .s-waiting .beacon { animation: beacon .5s steps(1) infinite; }
-@keyframes beacon { 50% { fill: #ffd166; filter: drop-shadow(0 0 8px #ff4d6d); } }
+@keyframes beacon { 50% { fill: #ffd166; } }
 .s-waiting .alert-bang { transform-origin: 50% 50%; animation: pop .8s ease-in-out infinite; }
 
 /* 完了してあなたの番 */
@@ -433,7 +436,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 /* ---------- ドロワー・詳細 ---------- */
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 94vw; z-index: 40; background: var(--drawer);
   border-left: 1px solid var(--line); padding: 14px 16px; transform: translateX(105%); transition: transform .45s cubic-bezier(.2, 1, .3, 1);
-  display: flex; flex-direction: column; backdrop-filter: blur(14px); }
+  display: flex; flex-direction: column; }
 .drawer.open { transform: none; box-shadow: -20px 0 60px rgba(0, 0, 0, .5); }
 .drawer.dpanel { width: 520px; overflow-y: auto; overflow-x: hidden; z-index: 45; }
 .drawer-head { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: .1em; color: var(--muted); margin-bottom: 10px; font-weight: 800; }
@@ -463,7 +466,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .timeline li .tm { color: var(--muted); font-size: 10px; margin-right: 6px; font-family: var(--num); }
 .timeline:empty::before { content: '読み込み中…'; color: var(--muted); font-size: 12px; }
 
-.modal { position: fixed; inset: 0; z-index: 70; background: var(--scrim); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; animation: fadeIn .25s; }
+.modal { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; padding: 16px; animation: fadeIn .25s; }
 @keyframes fadeIn { from { opacity: 0; } }
 .modal-card { width: min(860px, 100%); max-height: 86vh; overflow: auto; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 22px; padding: 16px 18px; animation: cardIn .4s cubic-bezier(.2, 1.4, .4, 1); }
 .modal-card.small { width: min(460px, 100%); }
@@ -676,3 +679,13 @@ body[data-tod="day"] .card[data-vis="waiting"] { box-shadow: 0 0 0 2px color-mix
 body[data-tod="day"] .pilot { border-color: rgba(168, 107, 0, .35); }
 body[data-tod="day"] .xp-pop { color: #a86b00; text-shadow: 0 1px 0 #fff, 0 0 8px rgba(255, 255, 255, .8); }
 body[data-tod="day"] .demo-chip a, body[data-tod="day"] a { color: #2a63d0; }
+
+/* ---------- 描画の軽量化 ---------- */
+.card { contain: layout paint; }
+.stage { contain: paint; }
+.stage .scene, .d-stage .scene { will-change: transform; }
+.card.offscreen .scene, .card.offscreen .scene *, .card.offscreen .scan::after { animation-play-state: paused !important; }
+body[data-lite] .card:not([data-vis="working"]):not([data-vis="waiting"]) .scene,
+body[data-lite] .card:not([data-vis="working"]):not([data-vis="waiting"]) .scene * { animation-play-state: paused !important; }
+body[data-lite] .logo h1, body[data-lite] .xpbar .shine, body[data-lite] .logo-mark span, body[data-lite] .scan { animation: none !important; }
+body[data-lite] .scan { display: none; }
