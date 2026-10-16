@@ -30,6 +30,7 @@
     </div>
     <div class="spacer"></div>
     <div class="conn" id="conn"><i></i><span>接続中…</span></div>
+    <button class="btn icon tod" id="todBtn" title="表示の時間帯 (T)">🌙</button>
     <button class="btn icon" id="achBtn" title="実績">🏆 <span id="achCount">0</span></button>
     <button class="btn icon" id="notifyBtn" title="返信待ちをデスクトップ通知">🔕</button>
     <button class="btn icon" id="soundBtn" title="効果音">🔇</button>
@@ -43,7 +44,7 @@
     <div class="stat" data-k="tools"><span class="ic">🔧</span><div><b id="stTools">0</b><small>今日のツール使用</small></div></div>
     <div class="stat" data-k="subs"><span class="ic">🤖</span><div><b id="stSubs">0</b><small>今日のサブエージェント</small></div></div>
     <div class="stat combo" data-k="combo" id="comboStat"><span class="ic">🔥</span><div><b id="stCombo">0</b><small>コンボ</small></div></div>
-    <div class="stat chart" title="直近3時間の同時稼働数"><svg id="chart" viewBox="0 0 300 60" preserveAspectRatio="none"></svg><small class="chart-lbl">稼働の推移 (3h) <span class="lg c">■Claude</span> <span class="lg x">■Codex</span></small></div>
+    <div class="stat chart" title="直近3時間の同時稼働数"><svg id="chart" viewBox="0 0 300 60" preserveAspectRatio="none"></svg><small class="chart-lbl">稼働の推移 (3h) <span class="lg c">■Claude</span> <span class="lg x">■Codex</span> <span class="lg q">┅待ち</span></small></div>
     <div class="stat usage-box" id="usageBox"></div>
   </section>
 
@@ -109,6 +110,7 @@
       <dt>F</dt><dd>ライブフィード</dd>
       <dt>E</dt><dd>終了済みの表示切替</dd>
       <dt>D</dt><dd>カードの大きさ (大 / 中 / 小)</dd>
+      <dt>T</dt><dd>表示の時間帯 (自動 / 朝 / 昼 / 夕方 / 夜)</dd>
       <dt>X</dt><dd>自動実行セッションの表示切替</dd>
       <dt>S</dt><dd>効果音 ON/OFF</dd>
       <dt>A</dt><dd>実績</dd>

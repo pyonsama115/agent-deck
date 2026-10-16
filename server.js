@@ -185,13 +185,15 @@ function summarizeClaudeTranscript(file) {
   if (!st) return null;
   const lines = readTailLines(file, st);
   const r = { mtimeMs: st.mtimeMs, title: '', lastPrompt: '', lastText: '', model: '', cwd: '', branch: '',
-    pendingTool: '', lastTool: '', lastStop: '', context: 0, costUSD: null, entrypoint: '', outTokens: 0, events: [] };
+    pendingTool: '', lastTool: '', lastStop: '', context: 0, costUSD: null, entrypoint: '', outTokens: 0, events: [], quota: null };
   const seen = new Set();
   const openTools = new Map();
   for (const o of lines) {
     if (o.cwd) r.cwd = o.cwd;
     if (o.gitBranch) r.branch = o.gitBranch;
     if (o.entrypoint) r.entrypoint = o.entrypoint;
+    // 使用上限に達したときだけ assistant 行に quotaLimits が付く
+    if (o.quotaLimits && o.quotaLimits.rateLimitType) r.quota = { ...o.quotaLimits, at: ts(o) };
     switch (o.type) {
       case 'ai-title': if (o.aiTitle) r.aiTitle = o.aiTitle; break;
       case 'custom-title': if (o.customTitle || o.title) r.customTitle = o.customTitle || o.title; break;
@@ -332,7 +334,7 @@ function collectClaude(now) {
       subagents, hooked: !!hook,
       forkOf: forkFrom ? localToCli.get(forkFrom) || null : null,
       resume: `claude --resume ${sid}`,
-      _events: t ? t.events : [], _file: file,
+      _events: t ? t.events : [], _file: file, _quota: t ? t.quota : null,
     });
   }
   return sessions;
@@ -408,7 +410,10 @@ function collectCodex(now) {
                 context = (p.info.last_token_usage || {}).input_tokens || context;
                 ctxWindow = p.info.model_context_window || ctxWindow;
               }
-              if (p.rate_limits && p.rate_limits.primary) rate = { primary: p.rate_limits.primary.used_percent, secondary: p.rate_limits.secondary ? p.rate_limits.secondary.used_percent : null };
+              if (p.rate_limits && (p.rate_limits.primary || p.rate_limits.secondary)) {
+                const w = x => x && x.used_percent != null ? { used: x.used_percent, minutes: x.window_minutes || null, resetsAt: x.resets_at ? x.resets_at * 1000 : null } : null;
+                rate = { windows: [w(p.rate_limits.primary), w(p.rate_limits.secondary)].filter(Boolean), plan: p.rate_limits.plan_type || null, reached: p.rate_limits.rate_limit_reached_type || null, at: ts(o) };
+              }
               break;
             default: break;
           }
@@ -506,22 +511,52 @@ function toolSummary(name, input) {
 
 // ---------- 使用枠 ----------
 
-// Claude デスクトップアプリが時々書き込む使用率の履歴 (fh = 5時間枠 %, sd = 週間枠 %)。リアルタイムではない。
-let planUsage = { mtimeMs: 0, value: null };
-function claudeUsage() {
+// 使用枠の窓の名前 (分 → 表示名)
+function windowLabel(min) {
+  if (!min) return '';
+  if (min === 300) return '5時間';
+  if (min === 10080) return '週';
+  if (min % 1440 === 0) return `${min / 1440}日`;
+  return `${Math.round(min / 60)}時間`;
+}
+
+// Claude: 使用率はデスクトップアプリが時々書き込む履歴にしかない (fh = 5時間枠 %, sd = 週間枠 %)。
+// 古い値は窓が切り替わっている可能性があるので、5時間枠は5時間、週枠は7日を過ぎたら「不明」にする。
+// 上限に達したときはトランスクリプトに quotaLimits (どの枠か・解除時刻) が残るので、それも使う。
+let planUsage = { mtimeMs: 0, sample: null };
+function claudeUsage(sessions, now) {
   const st = safeStat(PLAN_USAGE_FILE);
-  if (!st) return null;
-  if (st.mtimeMs !== planUsage.mtimeMs) {
+  if (st && st.mtimeMs !== planUsage.mtimeMs) {
     const o = readJson(PLAN_USAGE_FILE);
-    const last = o && Array.isArray(o.samples) ? o.samples[o.samples.length - 1] : null;
-    planUsage = { mtimeMs: st.mtimeMs, value: last && last.u ? { fiveHour: last.u.fh, sevenDay: last.u.sd, at: last.t } : null };
+    planUsage = { mtimeMs: st.mtimeMs, sample: o && Array.isArray(o.samples) ? o.samples[o.samples.length - 1] : null };
   }
-  return planUsage.value;
+  const smp = planUsage.sample;
+  const windows = [];
+  if (smp && smp.u) {
+    const age = now - smp.t;
+    windows.push({ label: '5時間', minutes: 300, used: age < 5 * 3600e3 ? smp.u.fh : null, at: smp.t });
+    windows.push({ label: '週', minutes: 10080, used: age < 7 * 86400e3 ? smp.u.sd : null, at: smp.t });
+  }
+  let reached = null;
+  for (const s of sessions) {
+    const q = s._quota;
+    if (q && q.status === 'rejected' && q.resetsAt && q.resetsAt * 1000 > now && (!reached || q.at > reached.at)) {
+      reached = { label: q.rateLimitType === 'seven_day' ? '週' : q.rateLimitType === 'five_hour' ? '5時間' : q.rateLimitType, resetsAt: q.resetsAt * 1000, at: q.at };
+    }
+  }
+  if (!windows.length && !reached) return null;
+  return { windows, at: smp ? smp.t : null, source: 'デスクトップアプリの記録', reached };
 }
 
 function codexUsage(sessions) {
-  const s = sessions.filter(x => x.agent === 'codex' && x.rate && x.rate.primary != null).sort((a, b) => b.lastActivity - a.lastActivity)[0];
-  return s ? { fiveHour: s.rate.primary, sevenDay: s.rate.secondary, at: s.lastActivity } : null;
+  const s = sessions.filter(x => x.agent === 'codex' && x.rate && x.rate.windows.length).sort((a, b) => (b.rate.at || 0) - (a.rate.at || 0))[0];
+  if (!s) return null;
+  const r = s.rate;
+  return {
+    windows: r.windows.map(w => ({ label: windowLabel(w.minutes), minutes: w.minutes, used: w.used, resetsAt: w.resetsAt, at: r.at })),
+    at: r.at, plan: r.plan, source: 'Codex のログ',
+    reached: r.reached ? { label: r.reached, resetsAt: null } : null,
+  };
 }
 
 // ---------- ゲーム要素: XP・レベル・実績 ----------
@@ -723,10 +758,10 @@ function tick() {
     s.level = botLevel(s.xp).level;
     s.levelProgress = botLevel(s.xp).progress;
     fileOf.set(s.id, s._file);
-    delete s._events; delete s._file;
   }
   lastStates = next;
-  const usage = { claude: claudeUsage(), codex: codexUsage(sessions) };
+  const usage = { claude: claudeUsage(sessions, now), codex: codexUsage(sessions) };
+  for (const s of sessions) { delete s._events; delete s._file; delete s._quota; }
   const gs = gameSummary(now);
   const json = JSON.stringify({ sessions, usage, gs });
   if (json !== snapshot.json) {

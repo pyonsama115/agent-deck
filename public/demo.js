@@ -34,7 +34,7 @@
     achievements: ACH.map(([id, icon, title, desc], i) => ({ id, icon, title, desc, at: i < 4 ? now - i * 86400e3 : null })),
     history: Array.from({ length: 360 }, (_, i) => { const t = now - (360 - i) * 30e3; const c = Math.max(0, Math.round(2 + Math.sin(i / 20) * 1.6)); return { t, c, x: Math.max(0, Math.round(1 + Math.cos(i / 15))), q: i % 47 === 0 ? 1 : 0 }; }),
   };
-  const push = () => applySnapshot({ sessions: S.map(s => ({ ...s })), usage: { claude: { fiveHour: 42, sevenDay: 63, at: Date.now() - 600e3 }, codex: { fiveHour: 18, sevenDay: 35, at: Date.now() - 60e3 } }, game: { ...g } });
+  const push = () => applySnapshot({ sessions: S.map(s => ({ ...s })), usage: { claude: { windows: [{ label: '5時間', minutes: 300, used: 42 }, { label: '週', minutes: 10080, used: 63 }], at: Date.now() - 600e3, source: 'デスクトップアプリの記録' }, codex: { windows: [{ label: '週', minutes: 10080, used: 36, resetsAt: Date.now() + 5.6 * 86400e3 }], at: Date.now() - 60e3, plan: 'prolite', source: 'Codex のログ' } }, game: { ...g } });
   $('#conn').classList.add('on'); setText($('#conn span'), 'DEMO');
   document.body.insertAdjacentHTML('beforeend', '<div class="demo-chip">🎮 デモ表示中 · <a href="./">本番に戻る</a></div>');
   push();

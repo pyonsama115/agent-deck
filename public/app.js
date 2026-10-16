@@ -286,14 +286,35 @@ function bumpNum(el, v) {
 }
 
 // ---------- 使用枠 ----------
+const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土'];
+function fmtReset(t) {
+  const d = new Date(t), now = Date.now();
+  const hm = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const left = t - now;
+  const rel = left < 3600e3 ? `あと${Math.max(1, Math.round(left / 60e3))}分` : left < 86400e3 ? `あと${Math.round(left / 3600e3)}時間` : `あと${Math.round(left / 86400e3)}日`;
+  const day = left < 86400e3 && d.getDate() === new Date().getDate() ? '' : `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY[d.getDay()]}) `;
+  return `${day}${hm} (${rel})`;
+}
 function renderUsage() {
-  const rows = ['claude', 'codex'].filter(a => usage[a] && (filter === 'all' || filter === a)).map(a => {
+  const blocks = ['claude', 'codex'].filter(a => usage[a] && (filter === 'all' || filter === a)).map(a => {
     const u = usage[a];
-    const meter = (label, v) => v == null ? '<span></span>' : `<span class="meter"><span>${label}</span><span class="mbar"><i style="width:${Math.min(100, v)}%;background:${v >= 90 ? 'var(--error)' : v >= 70 ? 'var(--reply)' : AGENT_COLOR[a]}"></i></span><b>${Math.round(v)}%</b></span>`;
-    const stale = Date.now() - u.at > 30 * 60e3;
-    return `<div class="urow"><span class="who" style="color:${AGENT_COLOR[a]}">${AGENT_NAME[a]}</span>${meter('5h', u.fiveHour)}${meter('週', u.sevenDay)}<span class="uat${stale ? ' stale' : ''}" title="この値を取得した時刻">${stale ? '⏳ ' : ''}${ago(u.at)}</span></div>`;
+    const src = u.at ? `${u.source || ''} · ${ago(u.at)}時点` : (u.source || '');
+    const reached = u.reached && (!u.reached.resetsAt || u.reached.resetsAt > Date.now())
+      ? `<div class="ureached">⛔ ${esc(u.reached.label)}枠の上限に到達${u.reached.resetsAt ? ` · ${fmtReset(u.reached.resetsAt)} に解除` : ''}</div>` : '';
+    const rows = (u.windows || []).map(w => {
+      if (w.used == null) return `<div class="uwin"><span class="ul">${esc(w.label)}</span><span class="uv unknown" title="記録が古く、枠がすでに切り替わっている可能性があります">不明 (記録が古い)</span></div>`;
+      const used = Math.max(0, Math.min(100, w.used));
+      // 3時間以上前の値は今と違う可能性が高いので目印を付ける
+      const old = w.at && Date.now() - w.at > 3 * 3600e3;
+      const col = used >= 90 ? 'var(--error)' : used >= 70 ? 'var(--reply)' : AGENT_COLOR[a];
+      return `<div class="uwin" title="${esc(w.label)}枠: ${Math.round(used)}% 使用 / 残り ${Math.round(100 - used)}%">
+        <span class="ul">${esc(w.label)}</span><span class="mbar"><i style="width:${used}%;background:${col}"></i></span>
+        <span class="uv${old ? ' old' : ''}">使用 <b>${Math.round(used)}%</b> · 残り ${Math.round(100 - used)}%${old ? `<span class="oldtag">⏳ ${ago(w.at)}の値</span>` : ''}</span>
+        ${w.resetsAt ? `<span class="ureset">↻ ${fmtReset(w.resetsAt)}</span>` : ''}</div>`;
+    }).join('');
+    return `<div class="ublock"><div class="uhead"><b style="color:${AGENT_COLOR[a]}">${AGENT_NAME[a]}</b>${u.plan ? `<span class="tag">${esc(u.plan)}</span>` : ''}<span class="usrc">${esc(src)}</span></div>${reached}${rows}</div>`;
   });
-  const html = rows.length ? rows.join('') : '<small>使用枠のデータはまだありません</small>';
+  const html = blocks.length ? blocks.join('') : '<small>使用枠のデータはまだありません</small>';
   if ($('#usageBox').innerHTML !== html) $('#usageBox').innerHTML = html;
 }
 
@@ -320,11 +341,11 @@ function renderChart(hist) {
   const svg = $('#chart');
   if (!hist || hist.length < 2) { svg.innerHTML = '<text x="150" y="34" text-anchor="middle" fill="#8d93b8" font-size="11">データを集めています…</text>'; return; }
   const W = 300, H = 60, t0 = Date.now() - 3 * 3600e3, t1 = Date.now();
-  const max = Math.max(3, ...hist.map(h => h.c + h.x));
+  const max = Math.max(3, ...hist.map(h => Math.max(h.c + h.x, h.q || 0)));
   const X = t => ((t - t0) / (t1 - t0)) * W, Y = v => H - 2 - (v / max) * (H - 8);
   const line = key => hist.map((h, i) => `${i ? 'L' : 'M'}${X(h.t).toFixed(1)} ${Y(key(h)).toFixed(1)}`).join(' ');
   const area = key => `${line(key)} L${X(hist[hist.length - 1].t).toFixed(1)} ${H} L${X(hist[0].t).toFixed(1)} ${H} Z`;
-  const waits = hist.filter(h => h.q).map(h => `<circle cx="${X(h.t).toFixed(1)}" cy="4" r="2" fill="#ffc531"/>`).join('');
+  const waits = hist.some(h => h.q) ? `<path d="${line(h => h.q || 0)}" fill="none" stroke="#ffc531" stroke-width="1.4" stroke-dasharray="4 3"/>` : '';
   svg.innerHTML = `<path d="${area(h => h.c + h.x)}" fill="#33e1c9" opacity=".35"/><path d="${area(h => h.c)}" fill="#ff8a4c" opacity=".55"/>
     <path d="${line(h => h.c + h.x)}" fill="none" stroke="#33e1c9" stroke-width="1.5"/><path d="${line(h => h.c)}" fill="none" stroke="#ff8a4c" stroke-width="1.5"/>${waits}`;
 }
@@ -508,35 +529,92 @@ function fxLoop() {
   requestAnimationFrame(fxLoop);
 }
 
-// ---------- 背景の星空 (進行中が多いほど流れが速くなる) ----------
+// ---------- 背景の空 (時間帯で朝・昼・夕方・夜に変わる / 進行中が多いほど流れが速くなる) ----------
+const TOD = {
+  morning: { label: '朝', icon: '🌅', sky: ['#2b2a6b', '#b8648e', '#ffc39b'], neb: [[255, 170, 150], [255, 214, 140]], stars: .25, sun: { x: .18, y: .86, r: 70, c: [255, 196, 120] }, clouds: [255, 200, 210], theme: '#2b2a6b' },
+  day: { label: '昼', icon: '☀️', sky: ['#4ea6ff', '#9fd2ff', '#e8f5ff'], neb: [[255, 255, 255], [180, 230, 255]], stars: 0, sun: { x: .85, y: .12, r: 46, c: [255, 240, 170] }, clouds: [255, 255, 255], theme: '#4ea6ff' },
+  evening: { label: '夕方', icon: '🌇', sky: ['#2a1650', '#b8406a', '#ff9450'], neb: [[255, 120, 90], [180, 90, 200]], stars: .35, sun: { x: .8, y: .84, r: 90, c: [255, 150, 70] }, clouds: [255, 160, 150], theme: '#2a1650' },
+  night: { label: '夜', icon: '🌙', sky: ['#191237', '#0a0d1d', '#05060d'], neb: [[255, 138, 76], [51, 225, 201]], stars: 1, moon: { x: .86, y: .12, r: 22 }, clouds: null, theme: '#070912' },
+};
+const TOD_ORDER = ['auto', 'morning', 'day', 'evening', 'night'];
+let todPref = TOD_ORDER.includes(pref('tod')) ? pref('tod') : 'auto';
+function todByClock(d = new Date()) { const h = d.getHours(); return h >= 5 && h < 10 ? 'morning' : h >= 10 && h < 16 ? 'day' : h >= 16 && h < 19 ? 'evening' : 'night'; }
+function currentTod() { return todPref === 'auto' ? todByClock() : todPref; }
+function applyTod() {
+  const t = currentTod();
+  if (document.body.dataset.tod !== t) document.body.dataset.tod = t;
+  const btn = $('#todBtn');
+  btn.textContent = TOD[t].icon;
+  btn.classList.toggle('auto', todPref === 'auto');
+  btn.title = todPref === 'auto' ? `表示: 自動 (いまは${TOD[t].label}) — クリックで切り替え (T)` : `表示: ${TOD[t].label} (固定) — クリックで切り替え (T)`;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = TOD[t].theme;
+}
+function cycleTod() {
+  todPref = TOD_ORDER[(TOD_ORDER.indexOf(todPref) + 1) % TOD_ORDER.length];
+  setPref('tod', todPref); applyTod();
+  toast(TOD[currentTod()].icon, todPref === 'auto' ? `表示を自動にしました (いまは${TOD[currentTod()].label})` : `${TOD[todPref].label}の表示に固定しました`, '#6aa8ff');
+}
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const rgb = (c, a = 1) => `rgba(${c.map(v => Math.round(v)).join(',')},${a})`;
+let skyNow = null;
 const sky = $('#sky'), sctx = sky.getContext('2d');
-let stars = [];
+let stars = [], clouds = [];
 function initStars() {
   stars = Array.from({ length: Math.min(400, Math.round(innerWidth * innerHeight / 5000)) }, () => ({
     x: Math.random() * innerWidth, y: Math.random() * innerHeight, z: Math.random() * .9 + .1, tw: Math.random() * 6.28, hue: Math.random() < .5 }));
+  clouds = Array.from({ length: 7 }, () => ({ x: Math.random() * innerWidth, y: innerHeight * (.06 + Math.random() * .5), s: .6 + Math.random() * .9, v: .15 + Math.random() * .3 }));
 }
 let warp = 0.2, pulse = 0;
 function skyLoop(t) {
-  const dpr = devicePixelRatio;
+  const dpr = devicePixelRatio, W = innerWidth, H = innerHeight;
+  const P = TOD[currentTod()];
+  // 時間帯が切り替わったら色をゆっくり近づける
+  const target = { sky: P.sky.map(hex), neb: P.neb, stars: P.stars, cloud: P.clouds ? 1 : 0 };
+  if (!skyNow) skyNow = JSON.parse(JSON.stringify(target));
+  const k = reduceMotion ? 1 : .03;
+  skyNow.sky = skyNow.sky.map((c, i) => mix(c, target.sky[i], k));
+  skyNow.neb = skyNow.neb.map((c, i) => mix(c, target.neb[i], k));
+  skyNow.stars += (target.stars - skyNow.stars) * k;
+  skyNow.cloud += (target.cloud - skyNow.cloud) * k;
   const working = sessions.filter(s => s.state === 'working').length;
   const waiting = sessions.some(s => s.state === 'waiting');
   warp += ((reduceMotion ? 0 : 0.25 + Math.min(working, 6) * 0.9) - warp) * 0.02;
   pulse = waiting ? (Math.sin(t / 400) + 1) / 2 : pulse * .95;
   sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const g = sctx.createRadialGradient(innerWidth * .2, innerHeight * .1, 0, innerWidth * .5, innerHeight * .5, innerWidth);
-  g.addColorStop(0, '#191237'); g.addColorStop(.5, '#0a0d1d'); g.addColorStop(1, '#05060d');
-  sctx.fillStyle = g; sctx.fillRect(0, 0, innerWidth, innerHeight);
-  const blob = (x, y, r, c, a) => { const rg = sctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, c.replace('A', a)); rg.addColorStop(1, c.replace('A', 0)); sctx.fillStyle = rg; sctx.fillRect(0, 0, innerWidth, innerHeight); };
-  blob(innerWidth * (.15 + Math.sin(t / 9000) * .05), innerHeight * .25, innerWidth * .4, 'rgba(255,138,76,A)', .10);
-  blob(innerWidth * (.85 + Math.cos(t / 11000) * .05), innerHeight * .7, innerWidth * .45, 'rgba(51,225,201,A)', .09);
-  if (pulse > .01) blob(innerWidth * .17, innerHeight * .35, innerWidth * .4, 'rgba(255,197,49,A)', .14 * pulse);
-  for (const s of stars) {
+  const g = sctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, rgb(skyNow.sky[0])); g.addColorStop(.55, rgb(skyNow.sky[1])); g.addColorStop(1, rgb(skyNow.sky[2]));
+  sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
+  const blob = (x, y, r, c, a) => { const rg = sctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, rgb(c, a)); rg.addColorStop(1, rgb(c, 0)); sctx.fillStyle = rg; sctx.fillRect(0, 0, W, H); };
+  blob(W * (.15 + Math.sin(t / 9000) * .05), H * .25, W * .4, skyNow.neb[0], .10);
+  blob(W * (.85 + Math.cos(t / 11000) * .05), H * .7, W * .45, skyNow.neb[1], .09);
+  // 太陽・月
+  if (P.sun) {
+    const sx = W * P.sun.x, sy = H * P.sun.y + Math.sin(t / 5000) * 4;
+    blob(sx, sy, P.sun.r * 4, P.sun.c, .35);
+    sctx.fillStyle = rgb(P.sun.c, .95); sctx.beginPath(); sctx.arc(sx, sy, P.sun.r, 0, Math.PI * 2); sctx.fill();
+  } else if (P.moon) {
+    const mx = W * P.moon.x, my = H * P.moon.y;
+    blob(mx, my, P.moon.r * 5, [255, 233, 168], .12);
+    sctx.fillStyle = 'rgba(255,233,168,.9)'; sctx.beginPath(); sctx.arc(mx, my, P.moon.r, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = rgb(skyNow.sky[0]); sctx.beginPath(); sctx.arc(mx + P.moon.r * .45, my - P.moon.r * .25, P.moon.r * .85, 0, Math.PI * 2); sctx.fill();
+  }
+  if (pulse > .01) blob(W * .17, H * .35, W * .4, [255, 197, 49], .14 * pulse);
+  if (skyNow.stars > .02) for (const s of stars) {
     s.x -= warp * s.z * 1.6;
-    if (s.x < -10) { s.x = innerWidth + 10; s.y = Math.random() * innerHeight; }
+    if (s.x < -10) { s.x = W + 10; s.y = Math.random() * H; }
     const tw = .5 + Math.sin(t / 700 + s.tw) * .5;
-    sctx.strokeStyle = s.hue ? `rgba(255,190,150,${.25 + .6 * tw * s.z})` : `rgba(160,240,255,${.25 + .6 * tw * s.z})`;
+    const a = (.25 + .6 * tw * s.z) * skyNow.stars;
+    sctx.strokeStyle = s.hue ? `rgba(255,190,150,${a})` : `rgba(160,240,255,${a})`;
     sctx.lineWidth = s.z * 1.6;
     sctx.beginPath(); sctx.moveTo(s.x, s.y); sctx.lineTo(s.x + warp * s.z * 6 + .5, s.y); sctx.stroke();
+  }
+  // 雲 (朝・昼・夕方)。作業中が多いと速く流れる
+  if (skyNow.cloud > .02 && P.clouds) for (const c of clouds) {
+    c.x -= c.v * (.4 + warp * .5);
+    if (c.x < -260 * c.s) { c.x = W + 200 * c.s; c.y = H * (.06 + Math.random() * .5); }
+    sctx.fillStyle = rgb(P.clouds, .55 * skyNow.cloud);
+    for (const [dx, dy, r] of [[0, 0, 40], [42, -14, 48], [92, 0, 38], [46, 10, 42]]) { sctx.beginPath(); sctx.arc(c.x + dx * c.s, c.y + dy * c.s, r * c.s, 0, Math.PI * 2); sctx.fill(); }
   }
   requestAnimationFrame(skyLoop);
 }
@@ -742,6 +820,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'f') $('#feedBtn').click();
   else if (k === 'e') $('#endedBtn').click();
   else if (k === 'x') $('#execBtn').click();
+  else if (k === 't') cycleTod();
   else if (k === 'd') setDensity({ l: 'm', m: 's', s: 'l' }[density]);
   else if (k === 's') $('#soundBtn').click();
   else if (k === 'a') openPanel('achModal', $('#achModal').hidden);
@@ -762,6 +841,9 @@ function setDensity(d) {
 }
 $$('#density [data-density]').forEach(b => b.addEventListener('click', () => setDensity(b.dataset.density)));
 setDensity(density);
+$('#todBtn').addEventListener('click', cycleTod);
+applyTod();
+setInterval(applyTod, 60e3);
 paintToggles();
 setInterval(tickClock, 1000); tickClock();
 if (DEMO) {
