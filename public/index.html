@@ -11,10 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="atelier.css">
-<link rel="stylesheet" href="analytics.css">
 </head>
-<body data-appearance="atelier">
+<body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--floor); stop-opacity: .75"/><stop offset="1" style="stop-color: var(--floor); stop-opacity: 0"/></linearGradient>
 </defs></svg>
@@ -60,8 +58,6 @@
     </div>
     <label class="search"><span>🔎</span><input id="search" type="search" placeholder="タイトル・プロジェクトで絞り込み ( / )" autocomplete="off"></label>
     <div class="seg" id="density" role="group" aria-label="カードの大きさ (D)" title="カードの大きさ (D)"><button data-density="l">大</button><button data-density="m">中</button><button data-density="s">小</button></div>
-    <button type="button" class="btn" id="analyticsBtn">週間・月間分析</button>
-    <button class="btn" id="studioBtn" title="演出スタジオ (V)">演出スタジオ</button>
     <button class="btn" id="execBtn" title="codex exec などの自動実行セッション">🤖 自動実行</button>
     <div class="chip ticker" id="ticker" title="クリックでフィードを開く"><span>📡</span><div class="tk" id="tk">セッションの動きを待っています…</div></div>
   </div>
@@ -116,7 +112,6 @@
       <dt>F</dt><dd>ライブフィード</dd>
       <dt>E</dt><dd>終了済みの表示切替</dd>
       <dt>D</dt><dd>カードの大きさ (大 / 中 / 小)</dd>
-      <dt>V</dt><dd>演出スタジオ</dd>
       <dt>T</dt><dd>表示の時間帯 (自動 / 朝 / 昼 / 夕方 / 夜)</dd>
       <dt>L</dt><dd>軽量モード (動きが重いとき)</dd>
       <dt>X</dt><dd>自動実行セッションの表示切替</dd>
@@ -130,12 +125,7 @@
 
 <div id="banner" class="banner" hidden></div>
 <div id="toasts"></div>
-<dialog id="motionStudio" class="studio-dialog" aria-labelledby="studioTitle"></dialog>
 <script src="scenes.js"></script>
-<script src="actors.js"></script>
-<script src="motion-scenes.js"></script>
 <script src="app.js"></script>
-<script src="studio.js"></script>
-<script src="analytics.js"></script>
 </body>
 </html>

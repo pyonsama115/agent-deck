@@ -255,11 +255,11 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes shake { 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
 
 /* 考え中 */
-.scene:not(.atelier-scene)[data-scene="think"] .main .arm-r { animation: chin 2.4s ease-in-out infinite; }
+.scene[data-scene="think"] .main .arm-r { animation: chin 2.4s ease-in-out infinite; }
 @keyframes chin { 0%, 100% { transform: rotate(-150deg); } 50% { transform: rotate(-140deg); } }
-.scene:not(.atelier-scene)[data-scene="think"] .main .head { animation: tiltThink 3s ease-in-out infinite; }
+.scene[data-scene="think"] .main .head { animation: tiltThink 3s ease-in-out infinite; }
 @keyframes tiltThink { 50% { transform: rotate(-8deg); } }
-.scene:not(.atelier-scene)[data-scene="think"] .main .eyes-pos { transform: translate(1.5px, -1.5px); }
+.scene[data-scene="think"] .main .eyes-pos { transform: translate(1.5px, -1.5px); }
 .s-think .cloud { animation: floaty 3s ease-in-out infinite; }
 .s-think .g1 { transform-origin: 50% 50%; animation: spin 3s linear infinite; }
 .s-think .g2 { transform-origin: 50% 50%; animation: spin 2s linear infinite reverse; }
@@ -269,19 +269,19 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-think .qmark { animation: floaty 2s ease-in-out infinite; }
 
 /* 読んでいる */
-.scene:not(.atelier-scene)[data-scene="read"] .main .arm-r { animation: scanArm 2.2s ease-in-out infinite; }
+.scene[data-scene="read"] .main .arm-r { animation: scanArm 2.2s ease-in-out infinite; }
 @keyframes scanArm { 0%, 100% { transform: rotate(-72deg); } 50% { transform: rotate(-96deg); } }
-.scene:not(.atelier-scene)[data-scene="read"] .main .eyes-pos { transform: translateX(2.5px); }
-.scene:not(.atelier-scene)[data-scene="read"] .main .head { animation: nod 2.2s ease-in-out infinite; }
+.scene[data-scene="read"] .main .eyes-pos { transform: translateX(2.5px); }
+.scene[data-scene="read"] .main .head { animation: nod 2.2s ease-in-out infinite; }
 .s-read .scanline { animation: scanDown 2.2s ease-in-out infinite; }
 @keyframes scanDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(84px); } }
 .s-read .page { transform-origin: 0% 50%; animation: flip 3.2s ease-in-out infinite; }
 @keyframes flip { 0%, 55% { transform: scaleX(1); } 75% { transform: scaleX(-1); opacity: .9; } 76%, 100% { transform: scaleX(1); opacity: 0; } }
 
 /* 編集 (トンカチ) */
-.scene:not(.atelier-scene)[data-scene="edit"] .main .arm-r { animation: hammer .6s cubic-bezier(.55, 0, .9, .6) infinite; }
+.scene[data-scene="edit"] .main .arm-r { animation: hammer .6s cubic-bezier(.55, 0, .9, .6) infinite; }
 @keyframes hammer { 0% { transform: rotate(-140deg); } 60% { transform: rotate(-58deg); } 70% { transform: rotate(-64deg); } 100% { transform: rotate(-140deg); } }
-.scene:not(.atelier-scene)[data-scene="edit"] .main .body-grp { animation: bob .3s ease-in-out infinite alternate; }
+.scene[data-scene="edit"] .main .body-grp { animation: bob .3s ease-in-out infinite alternate; }
 .s-edit .sparks { opacity: 0; animation: spark .6s linear infinite; transform-origin: 50% 100%; }
 @keyframes spark { 0%, 55% { opacity: 0; transform: scale(.4); } 62% { opacity: 1; transform: scale(1.2); } 85%, 100% { opacity: 0; transform: scale(1.4); } }
 .s-edit .code { transform-origin: 0% 50%; animation: grow 4.2s ease-out infinite; }
@@ -291,11 +291,11 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes anvilHit { 0%, 58% { transform: none; } 62% { transform: scaleY(.92); } 70% { transform: none; } }
 
 /* ターミナル (ノートPCでカタカタ) */
-.scene:not(.atelier-scene)[data-scene="shell"] .main .arm-l { animation: typeL .2s ease-in-out infinite alternate; }
-.scene:not(.atelier-scene)[data-scene="shell"] .main .arm-r { animation: typeR .2s ease-in-out infinite alternate; animation-delay: -.1s; }
-.scene:not(.atelier-scene)[data-scene="shell"] .main .eyes-pos { transform: translateY(2.5px); }
-.scene:not(.atelier-scene)[data-scene="shell"] .main .head { animation: nod .9s ease-in-out infinite; }
-.scene:not(.atelier-scene)[data-scene="shell"] .main .body-grp { animation: bob .4s ease-in-out infinite alternate; }
+.scene[data-scene="shell"] .main .arm-l { animation: typeL .2s ease-in-out infinite alternate; }
+.scene[data-scene="shell"] .main .arm-r { animation: typeR .2s ease-in-out infinite alternate; animation-delay: -.1s; }
+.scene[data-scene="shell"] .main .eyes-pos { transform: translateY(2.5px); }
+.scene[data-scene="shell"] .main .head { animation: nod .9s ease-in-out infinite; }
+.scene[data-scene="shell"] .main .body-grp { animation: bob .4s ease-in-out infinite alternate; }
 .scene .laptop .screen-glow { animation: flicker .5s steps(2) infinite; }
 .s-shell .tl { opacity: 0; animation: termLine 3.6s steps(1) infinite; }
 .s-shell .t1 { animation-delay: .5s; } .s-shell .t2 { animation-delay: 1s; } .s-shell .t3 { animation-delay: 1.5s; } .s-shell .t4 { animation-delay: 2s; } .s-shell .t5 { animation-delay: 2.5s; }
@@ -303,10 +303,10 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-shell .cursor { animation: blink .8s steps(1) infinite; }
 
 /* Web 調査 */
-.scene:not(.atelier-scene)[data-scene="web"] .main .arm-r { animation: remote 1.6s ease-in-out infinite; }
+.scene[data-scene="web"] .main .arm-r { animation: remote 1.6s ease-in-out infinite; }
 @keyframes remote { 0%, 100% { transform: rotate(-62deg); } 50% { transform: rotate(-70deg); } }
-.scene:not(.atelier-scene)[data-scene="web"] .main .ant-tip { animation: antGlow .5s ease-in-out infinite alternate; }
-.scene:not(.atelier-scene)[data-scene="web"] .main .eyes-pos { transform: translateX(2px); }
+.scene[data-scene="web"] .main .ant-tip { animation: antGlow .5s ease-in-out infinite alternate; }
+.scene[data-scene="web"] .main .eyes-pos { transform: translateX(2px); }
 .s-web .land { animation: landRoll 7s linear infinite; }
 @keyframes landRoll { to { transform: translateX(-92px); } }
 .s-web .waves path { opacity: 0; animation: waveOut 1.5s ease-out infinite; transform-origin: 0% 50%; }
@@ -316,8 +316,8 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes haloPulse { 50% { transform: scale(1.08); opacity: .25; } }
 
 /* ブラウザ操作 */
-.scene:not(.atelier-scene)[data-scene="browser"] .main .arm-r { animation: remote 1.2s ease-in-out infinite; }
-.scene:not(.atelier-scene)[data-scene="browser"] .main .eyes-pos { transform: translateX(2.5px); }
+.scene[data-scene="browser"] .main .arm-r { animation: remote 1.2s ease-in-out infinite; }
+.scene[data-scene="browser"] .main .eyes-pos { transform: translateX(2.5px); }
 .s-browser .cursor-arrow { animation: cursorMove 3.6s ease-in-out infinite; }
 @keyframes cursorMove {
   0% { transform: translate(200px, 64px); } 25% { transform: translate(300px, 66px); } 45%, 55% { transform: translate(282px, 100px); }
@@ -329,17 +329,17 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes btnPress { 0%, 56% { transform: none; } 58% { transform: scale(.92); filter: brightness(1.4); } 64%, 100% { transform: none; } }
 
 /* 計画 */
-.scene:not(.atelier-scene)[data-scene="plan"] .main .arm-r { animation: tap 1.1s ease-in-out infinite; }
+.scene[data-scene="plan"] .main .arm-r { animation: tap 1.1s ease-in-out infinite; }
 @keyframes tap { 0%, 100% { transform: rotate(-84deg); } 50% { transform: rotate(-100deg); } }
-.scene:not(.atelier-scene)[data-scene="plan"] .main .eyes-pos { transform: translateX(2.5px); }
+.scene[data-scene="plan"] .main .eyes-pos { transform: translateX(2.5px); }
 .s-plan .chk { stroke-dasharray: 20; stroke-dashoffset: 20; animation: check 5s ease-out infinite; }
 .s-plan .k1 { animation-delay: .9s; } .s-plan .k2 { animation-delay: 1.8s; } .s-plan .k3 { animation-delay: 2.7s; }
 @keyframes check { 0% { stroke-dashoffset: 20; } 10%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; opacity: 0; } }
 
 /* その他ツール (工場) */
-.scene:not(.atelier-scene)[data-scene="mcp"] .main .arm-r { animation: wrench .7s ease-in-out infinite alternate; }
+.scene[data-scene="mcp"] .main .arm-r { animation: wrench .7s ease-in-out infinite alternate; }
 @keyframes wrench { from { transform: rotate(-60deg); } to { transform: rotate(-100deg); } }
-.scene:not(.atelier-scene)[data-scene="mcp"] .main .body-grp { animation: bob .35s ease-in-out infinite alternate; }
+.scene[data-scene="mcp"] .main .body-grp { animation: bob .35s ease-in-out infinite alternate; }
 .s-mcp .g1 { transform-origin: 50% 50%; animation: spin 2.4s linear infinite; }
 .s-mcp .g2 { transform-origin: 50% 50%; animation: spin 1.6s linear infinite reverse; }
 .s-mcp .cbox { animation: conveyor 3.6s linear infinite; opacity: 0; }
@@ -349,10 +349,10 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-mcp .steam circle { animation: floatUp 1.8s ease-out infinite; } .s-mcp .steam circle:nth-child(2) { animation-delay: .6s; }
 
 /* サブエージェントに指示 */
-.scene:not(.atelier-scene)[data-scene="agent"] .main .arm-r { animation: megaphone 1.4s ease-in-out infinite; }
+.scene[data-scene="agent"] .main .arm-r { animation: megaphone 1.4s ease-in-out infinite; }
 @keyframes megaphone { 0%, 100% { transform: rotate(-96deg); } 50% { transform: rotate(-106deg); } }
-.scene:not(.atelier-scene)[data-scene="agent"] .main .body-grp { animation: bob .7s ease-in-out infinite alternate; }
-.scene:not(.atelier-scene)[data-scene="agent"] .main .arm-l { animation: pointL 1.4s ease-in-out infinite; }
+.scene[data-scene="agent"] .main .body-grp { animation: bob .7s ease-in-out infinite alternate; }
+.scene[data-scene="agent"] .main .arm-l { animation: pointL 1.4s ease-in-out infinite; }
 @keyframes pointL { 50% { transform: rotate(20deg); } }
 .s-agent .callout { animation: blink .7s steps(2) infinite; }
 .s-agent .orders g { opacity: 0; animation: order 7.5s infinite; transform-origin: 0% 100%; }
@@ -360,10 +360,10 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 @keyframes order { 0% { opacity: 0; transform: scale(.6); } 4%, 30% { opacity: 1; transform: scale(1); } 34%, 100% { opacity: 0; } }
 
 /* あなたの返事待ち */
-.scene:not(.atelier-scene)[data-scene="waiting"] .main .arm-r { animation: wave .32s ease-in-out infinite alternate; }
-.scene:not(.atelier-scene)[data-scene="waiting"] .main .body-grp { animation: hop .7s cubic-bezier(.3, 0, .5, 1) infinite; }
-.scene:not(.atelier-scene)[data-scene="waiting"] .main .shadow { animation: shadowHop .7s cubic-bezier(.3, 0, .5, 1) infinite; }
-.scene:not(.atelier-scene)[data-scene="waiting"] .main .eyes { animation: none; transform: scale(1.2); }
+.scene[data-scene="waiting"] .main .arm-r { animation: wave .32s ease-in-out infinite alternate; }
+.scene[data-scene="waiting"] .main .body-grp { animation: hop .7s cubic-bezier(.3, 0, .5, 1) infinite; }
+.scene[data-scene="waiting"] .main .shadow { animation: shadowHop .7s cubic-bezier(.3, 0, .5, 1) infinite; }
+.scene[data-scene="waiting"] .main .eyes { animation: none; transform: scale(1.2); }
 .s-waiting .sign { transform-origin: 50% 100%; animation: signWobble 1.6s ease-in-out infinite; }
 @keyframes signWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 .s-waiting .beacon { animation: beacon .5s steps(1) infinite; }
@@ -371,9 +371,9 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-waiting .alert-bang { transform-origin: 50% 50%; animation: pop .8s ease-in-out infinite; }
 
 /* 完了してあなたの番 */
-.scene:not(.atelier-scene)[data-scene="yourturn"] .main .arm-r { animation: flagWave 1.2s ease-in-out infinite; }
+.scene[data-scene="yourturn"] .main .arm-r { animation: flagWave 1.2s ease-in-out infinite; }
 @keyframes flagWave { 0%, 100% { transform: rotate(-150deg); } 50% { transform: rotate(-168deg); } }
-.scene:not(.atelier-scene)[data-scene="yourturn"] .main .body-grp { animation: sway 2.4s ease-in-out infinite; }
+.scene[data-scene="yourturn"] .main .body-grp { animation: sway 2.4s ease-in-out infinite; }
 @keyframes sway { 50% { transform: translateY(-2px) rotate(-2deg); } }
 .scene .flag-cloth { transform-origin: 0% 50%; animation: cloth .5s ease-in-out infinite alternate; }
 @keyframes cloth { to { transform: skewY(8deg) scaleX(.9); } }
@@ -385,31 +385,31 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-
 .s-yourturn .okb { transform-origin: 0% 100%; animation: pop 2.4s ease-in-out infinite; }
 
 /* 待機 (すやすや) */
-.scene:not(.atelier-scene)[data-scene="standby"] .main .eyes { animation: none; transform: scaleY(.12); }
-.scene:not(.atelier-scene)[data-scene="standby"] .main .head { animation: doze 4s ease-in-out infinite; }
+.scene[data-scene="standby"] .main .eyes { animation: none; transform: scaleY(.12); }
+.scene[data-scene="standby"] .main .head { animation: doze 4s ease-in-out infinite; }
 @keyframes doze { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(13deg) translateY(1px); } }
-.scene:not(.atelier-scene)[data-scene="standby"] .main .body-grp { animation: breathe 4s ease-in-out infinite; }
+.scene[data-scene="standby"] .main .body-grp { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: scaleY(.97); } }
-.scene:not(.atelier-scene)[data-scene="standby"] .main .arm-l { transform: rotate(8deg); } .scene:not(.atelier-scene)[data-scene="standby"] .main .arm-r { transform: rotate(-8deg); }
+.scene[data-scene="standby"] .main .arm-l { transform: rotate(8deg); } .scene[data-scene="standby"] .main .arm-r { transform: rotate(-8deg); }
 .s-standby .zzz text { opacity: 0; animation: zzz 3s ease-in-out infinite; }
 .s-standby .zzz text:nth-child(2) { animation-delay: 1s; } .s-standby .zzz text:nth-child(3) { animation-delay: 2s; }
 @keyframes zzz { 0% { opacity: 0; transform: translate(0, 4px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -14px) scale(1.2); } }
 .s-standby .st { animation: blink 2.4s ease-in-out infinite; } .s-standby .st1 { animation-delay: .5s; } .s-standby .st2 { animation-delay: 1.1s; } .s-standby .st3 { animation-delay: 1.6s; } .s-standby .st4 { animation-delay: .8s; }
 
 /* エラー */
-.scene:not(.atelier-scene)[data-scene="error"] .main .eyes, .scene:not(.atelier-scene)[data-scene="stale"] .main .eyes { opacity: 0; animation: none; }
-.scene:not(.atelier-scene)[data-scene="error"] .main .xeyes, .scene:not(.atelier-scene)[data-scene="stale"] .main .xeyes { opacity: 1; }
-.scene:not(.atelier-scene)[data-scene="error"] .main .body-grp, .scene:not(.atelier-scene)[data-scene="stale"] .main .body-grp { animation: shake .4s steps(4) infinite; }
-.scene:not(.atelier-scene)[data-scene="error"] .main .chest, .scene:not(.atelier-scene)[data-scene="stale"] .main .chest { fill: var(--error); animation: blink .5s infinite; }
+.scene[data-scene="error"] .main .eyes, .scene[data-scene="stale"] .main .eyes { opacity: 0; animation: none; }
+.scene[data-scene="error"] .main .xeyes, .scene[data-scene="stale"] .main .xeyes { opacity: 1; }
+.scene[data-scene="error"] .main .body-grp, .scene[data-scene="stale"] .main .body-grp { animation: shake .4s steps(4) infinite; }
+.scene[data-scene="error"] .main .chest, .scene[data-scene="stale"] .main .chest { fill: var(--error); animation: blink .5s infinite; }
 .s-error .warn { animation: blink .9s steps(1) infinite; }
 .s-error .smoke circle { animation: floatUp 2s ease-out infinite; } .s-error .smoke circle:nth-child(2) { animation-delay: .7s; } .s-error .smoke circle:nth-child(3) { animation-delay: 1.4s; }
 .s-error .zap { animation: blink .3s steps(1) infinite; }
 
 /* 中断 */
-.scene:not(.atelier-scene)[data-scene="interrupted"] .main .arm-r { animation: scratch .25s ease-in-out infinite alternate; }
+.scene[data-scene="interrupted"] .main .arm-r { animation: scratch .25s ease-in-out infinite alternate; }
 @keyframes scratch { from { transform: rotate(-160deg); } to { transform: rotate(-172deg); } }
-.scene:not(.atelier-scene)[data-scene="interrupted"] .main .sweat { opacity: 1; animation: floatUp 1.6s ease-in infinite reverse; }
-.scene:not(.atelier-scene)[data-scene="interrupted"] .main .eyes { animation: none; transform: scaleY(.5); }
+.scene[data-scene="interrupted"] .main .sweat { opacity: 1; animation: floatUp 1.6s ease-in infinite reverse; }
+.scene[data-scene="interrupted"] .main .eyes { animation: none; transform: scaleY(.5); }
 .s-interrupted .stop { transform-origin: 50% 100%; animation: signWobble 2.4s ease-in-out infinite; }
 
 /* ---------- サブエージェント (ちびロボ) ---------- */

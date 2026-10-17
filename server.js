@@ -6,8 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { readCodexLimits } = require('./codex-limits');
-const { createAnalytics } = require('./analytics');
-const { attachCodexSubagents, codexParentId } = require('./subagents');
 
 const PORT = Number(process.env.AGENT_DECK_PORT || 8787);
 const HOST = process.env.AGENT_DECK_HOST || '127.0.0.1';
@@ -24,7 +22,6 @@ const POLL_MS = 2000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
-const analytics = createAnalytics({ claudeDir: CLAUDE_DIR, codexDir: CODEX_DIR, claudePlanUsageFile: PLAN_USAGE_FILE });
 
 // ---------- ファイル読み取りユーティリティ ----------
 
@@ -265,7 +262,7 @@ function claudeSubagents(file, now, fresh) {
     if (now - st.mtimeMs < 30e3) active++;
     if (st.birthtimeMs >= dayStart) today++;
   }
-  const value = total ? { active, total, today, estimated: true, source: 'transcript-mtime', coverage: 'session-subagent-files' } : null;
+  const value = total ? { active, total, today } : null;
   subCache.set(file, { at: now, value });
   return value;
 }
@@ -441,7 +438,7 @@ function collectCodex(now) {
       const tool = state === 'working' ? ((hook && hook.tool && hook.at >= st.mtimeMs - 1500) ? hook.tool : (toolOpen ? lastTool : '')) : '';
       const isExec = meta.originator === 'codex_exec' || meta.source === 'exec';
       sessions.push({
-        id: `codex:${sid}`, agent: 'codex', sessionId: sid, parentSessionId: codexParentId(meta),
+        id: `codex:${sid}`, agent: 'codex', sessionId: sid,
         title: titles.get(sid) || clip(lastPrompt, 40) || path.basename(cwd) || sid.slice(0, 8),
         cwd, project: path.basename(cwd), branch: meta.git ? meta.git.branch || '' : '',
         source: meta.originator || (typeof meta.source === 'string' ? meta.source : ''), isExec, model,
@@ -853,7 +850,6 @@ function tick() {
   try { sessions = sessions.concat(collectClaude(now)); } catch (e) { console.error('claude', e); }
   try { sessions = sessions.concat(collectCodex(now)); } catch (e) { console.error('codex', e); }
   sessions.sort((a, b) => b.lastActivity - a.lastActivity);
-  attachCodexSubagents(sessions, now);
   try { award(now, sessions); } catch (e) { console.error('award', e); }
   sampleHistory(now, sessions);
   const next = new Map();
@@ -905,7 +901,6 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (analytics.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname.startsWith('/hook/')) {
     const agent = url.pathname.slice(6);
     let body = '';
@@ -973,5 +968,3 @@ server.listen(PORT, HOST, () => {
   console.log(`  Claude: ${CLAUDE_DIR}`);
   console.log(`  Codex : ${CODEX_DIR}`);
 });
-
-

@@ -20,8 +20,6 @@
 
   // agent: claude|codex, o: {prop, laptop, box, mini}
   function robot(agent, o = {}) {
-    agent = agent === "codex" ? "codex" : "claude";
-    if (window.MotionActors && Number(o.look) > 0) return MotionActors.render(agent, o, PROPS, PALETTE);
     const P = PALETTE[agent];
     const main = o.mini ? P.mini : P.main, dark = o.mini ? P.miniDark : P.dark;
     const head = agent === 'claude'
@@ -251,28 +249,27 @@
     { x: 178, y: 56, s: .44 }, { x: 236, y: 56, s: .44 }, { x: 294, y: 56, s: .44 },
   ];
 
-  function minis(agent, n, look = 0) {
+  function minis(agent, n) {
     let out = '';
     for (let i = Math.min(n, 6) - 1; i >= 0; i--) {
       const job = JOBS[i], sl = SLOTS[i];
       const tools = job === 'hammer' ? `<g class="mini-anvil"><rect x="64" y="80" width="30" height="14" rx="3" fill="#3a4370"/></g><g class="mini-spark" stroke="#ffd166" stroke-width="3" stroke-linecap="round"><path d="M70 76 l-6 -7 M78 74 v-9 M86 76 l6 -7"/></g>` : '';
       const note = `<text class="mini-emote" x="62" y="4" font-size="16">${['♪', '💦', '✨', '💪', '♪', '🔨'][i]}</text>`;
       out += `<g transform="translate(${sl.x} ${sl.y}) scale(${sl.s})"><g class="mini job-${job}" style="--d:${(i * .37).toFixed(2)}s">${tools}
-        ${robot(agent, { mini: true, look: look ? 1 + ((look + i + 2) % 15) : 0, prop: job === 'hammer' ? 'hammer' : job === 'scan' ? 'magnifier' : null, laptop: job === 'type', box: job === 'carry' })}${note}</g></g>`;
+        ${robot(agent, { mini: true, prop: job === 'hammer' ? 'hammer' : job === 'scan' ? 'magnifier' : null, laptop: job === 'type', box: job === 'carry' })}${note}</g></g>`;
     }
     return out;
   }
 
   // scene: think|read|edit|shell|web|browser|plan|mcp|agent|waiting|yourturn|standby|error|stale|interrupted
   function buildScene(agent, scene, o = {}) {
-    agent = agent === "codex" ? "codex" : "claude";
     const P = PALETTE[agent];
     const def = (SCENES[scene] || SCENES.think)(P, o);
-    const crew = scene === 'agent' ? minis(agent, Number.isFinite(o.minis) ? Math.max(0, o.minis) : 0, o.look) : '';
+    const crew = scene === 'agent' ? minis(agent, Math.max(1, o.minis || 1)) : '';
     return `<svg class="scene" data-scene="${scene}" viewBox="0 0 360 150" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
       <rect class="floor" x="0" y="134" width="360" height="16" fill="url(#floorGrad)"/>
       ${def.back}
-      <g transform="translate(22 26) scale(1.14)"><g class="main">${robot(agent, { prop: def.prop, laptop: def.laptop, look: o.look })}</g></g>
+      <g transform="translate(22 26) scale(1.14)"><g class="main">${robot(agent, { prop: def.prop, laptop: def.laptop })}</g></g>
       ${crew}
     </svg>`;
   }

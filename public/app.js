@@ -27,9 +27,7 @@ const ACT_ICON = { think: '💭', read: '🔍', edit: '🔨', shell: '⌨️', w
 const STATE_COLOR = { working: 'var(--progress)', waiting: 'var(--reply)', idle: 'var(--reply)', error: 'var(--error)', stale: 'var(--error)', interrupted: 'var(--reply)', ended: 'var(--muted)' };
 const AGENT_COLOR = { claude: '#ff8a4c', codex: '#33e1c9' };
 const AGENT_NAME = { claude: 'Claude', codex: 'Codex' };
-const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
-let reduceMotion = motionPreference.matches;
-motionPreference.addEventListener('change', e => { reduceMotion = e.matches; MotionScenes.configure({}); });
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let sessions = [];
 let usage = {};
@@ -38,7 +36,7 @@ let filter = pref('filter') || 'all';
 let search = '';
 let showEnded = pref('showEnded') === '1';
 let showExec = pref('showExec') !== '0';
-let density = ['l', 'm', 's'].includes(pref('density')) ? pref('density') : 'l';
+let density = ['l', 'm', 's'].includes(pref('density')) ? pref('density') : 'm';
 let sound = pref('sound') === '1';
 let lite = pref('lite') === '1';
 let notify = pref('notify') === '1' && 'Notification' in window && Notification.permission === 'granted';
@@ -150,11 +148,11 @@ function updateCard(el, s, vis) {
   const bothWork = vis === 'working' && el._vis0 === 'working';
   if (bothWork && el._scene && scene !== el._scene && now - el._sceneAt < SCENE_MIN_MS) scene = el._scene;
   el._vis0 = vis;
-  const minis = scene === 'agent' ? (s.subagents && Number.isFinite(s.subagents.active) ? Math.max(0, Math.trunc(s.subagents.active)) : null) : 0;
-  const key = `${scene}|${minis}|${isPermission(s)}|${MotionScenes.selection(scene,s.id).key}`;
+  const minis = scene === 'agent' ? Math.max(1, Math.min(6, (s.subagents && s.subagents.active) || 1)) : 0;
+  const key = `${scene}|${minis}|${isPermission(s)}`;
   if (el._sceneKey !== key) {
     const stage = $('.stage', el);
-    $('.scene-host', el).innerHTML = Scenes.buildScene(s.agent, scene, { minis, permission: isPermission(s), seed: s.id });
+    $('.scene-host', el).innerHTML = Scenes.buildScene(s.agent, scene, { minis, permission: isPermission(s) });
     if (el._sceneKey) { stage.classList.remove('swap'); void stage.offsetWidth; stage.classList.add('swap'); }
     if (scene !== el._scene) { el._scene = scene; el._sceneAt = now; }
     el._sceneKey = key;
@@ -349,15 +347,15 @@ function renderGame() {
 
 function renderChart(hist) {
   const svg = $('#chart');
-  if (!hist || hist.length < 2) { svg.innerHTML = '<text x="150" y="34" text-anchor="middle" fill="var(--muted)" font-size="11">データを集めています…</text>'; return; }
+  if (!hist || hist.length < 2) { svg.innerHTML = '<text x="150" y="34" text-anchor="middle" fill="#8d93b8" font-size="11">データを集めています…</text>'; return; }
   const W = 300, H = 60, t0 = Date.now() - 3 * 3600e3, t1 = Date.now();
   const max = Math.max(3, ...hist.map(h => Math.max(h.c + h.x, h.q || 0)));
   const X = t => ((t - t0) / (t1 - t0)) * W, Y = v => H - 2 - (v / max) * (H - 8);
   const line = key => hist.map((h, i) => `${i ? 'L' : 'M'}${X(h.t).toFixed(1)} ${Y(key(h)).toFixed(1)}`).join(' ');
   const area = key => `${line(key)} L${X(hist[hist.length - 1].t).toFixed(1)} ${H} L${X(hist[0].t).toFixed(1)} ${H} Z`;
-  const waits = hist.some(h => h.q) ? `<path d="${line(h => h.q || 0)}" fill="none" stroke="var(--reply)" stroke-width="1.4" stroke-dasharray="4 3"/>` : '';
-  svg.innerHTML = `<path d="${area(h => h.c + h.x)}" fill="var(--codex)" opacity=".35"/><path d="${area(h => h.c)}" fill="var(--claude)" opacity=".55"/>
-    <path d="${line(h => h.c + h.x)}" fill="none" stroke="var(--codex)" stroke-width="1.5"/><path d="${line(h => h.c)}" fill="none" stroke="var(--claude)" stroke-width="1.5"/>${waits}`;
+  const waits = hist.some(h => h.q) ? `<path d="${line(h => h.q || 0)}" fill="none" stroke="#ffc531" stroke-width="1.4" stroke-dasharray="4 3"/>` : '';
+  svg.innerHTML = `<path d="${area(h => h.c + h.x)}" fill="#33e1c9" opacity=".35"/><path d="${area(h => h.c)}" fill="#ff8a4c" opacity=".55"/>
+    <path d="${line(h => h.c + h.x)}" fill="none" stroke="#33e1c9" stroke-width="1.5"/><path d="${line(h => h.c)}" fill="none" stroke="#ff8a4c" stroke-width="1.5"/>${waits}`;
 }
 
 function renderAchievements() {
@@ -525,10 +523,6 @@ function rain(cols) {
   startFx();
 }
 function fxLoop() {
-  if (document.hidden || reduceMotion || document.body.dataset.motion === 'paused') {
-    parts = []; rings = []; fxRunning = false;
-    fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, fx.width, fx.height); return;
-  }
   const dpr = FX_DPR();
   fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   fctx.clearRect(0, 0, innerWidth, innerHeight);
@@ -706,7 +700,6 @@ function drawBase(t, P, W, H) {
 
 function skyLoop(t) {
   requestAnimationFrame(skyLoop);
-  if (document.hidden || document.body.dataset.appearance !== "original" || document.body.dataset.motion === "paused" || reduceMotion) return;
   // 軽量モードは 15fps 程度に間引く
   if (lite && (++liteFrame % 4)) return;
   const W = innerWidth, H = innerHeight, sc = SKY_SCALE();
@@ -863,9 +856,9 @@ function renderDetailMeta() {
   if (!s) return;
   const vis = visOf(s);
   const scene = sceneOf(s, vis === 'ended' ? 'standby' : vis);
-  const minis = scene === 'agent' ? (s.subagents && Number.isFinite(s.subagents.active) ? Math.max(0, Math.trunc(s.subagents.active)) : null) : 0;
-  const key = `${s.agent}|${scene}|${minis}|${isPermission(s)}|${MotionScenes.selection(scene,s.id).key}`;
-  if ($('#dStage')._key !== key) { $('#dStage').innerHTML = Scenes.buildScene(s.agent, scene, { minis, permission: isPermission(s), seed: s.id }); $('#dStage')._key = key; }
+  const minis = scene === 'agent' ? Math.max(1, Math.min(6, (s.subagents && s.subagents.active) || 1)) : 0;
+  const key = `${s.agent}|${scene}|${minis}`;
+  if ($('#dStage')._key !== key) { $('#dStage').innerHTML = Scenes.buildScene(s.agent, scene, { minis, permission: isPermission(s) }); $('#dStage')._key = key; }
   setText($('#dTitle'), s.title);
   const rows = [
     ['エージェント', `${AGENT_NAME[s.agent]}${s.source ? ` (${s.source})` : ''}`],
@@ -1043,9 +1036,3 @@ if (DEMO) {
   s.src = 'demo.js';
   document.body.appendChild(s);
 } else connect();
-
-// Refresh presentation without changing session data or provider state.
-document.addEventListener('deck:appearance', () => {
-  noFlip = true; render(); noFlip = false;
-  if (detailId) { $('#dStage')._key = null; renderDetailMeta(); }
-});
