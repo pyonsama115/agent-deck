@@ -20,7 +20,6 @@ function log(line) {
   } catch { }
 }
 
-fs.writeFileSync(PID, String(process.pid));
 let restarts = [];
 function run() {
   const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], { cwd: __dirname, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -40,5 +39,11 @@ function run() {
 function cleanup() { try { if (fs.readFileSync(PID, 'utf8') === String(process.pid)) fs.unlinkSync(PID); } catch { } }
 process.on('exit', cleanup);
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanup(); process.exit(0); });
-log('daemon 開始');
-run();
+// すでに Agent Deck が動いていれば何もしない (ログイン時の自動起動と手動起動が重なっても二重にならない)
+const port = Number(process.env.AGENT_DECK_PORT || 8787);
+const probe = require('net').connect({ host: '127.0.0.1', port });
+probe.setTimeout(1500);
+probe.on('connect', () => { probe.destroy(); log(`ポート ${port} で既に動いているので起動しません`); process.exit(0); });
+const start = () => { probe.destroy(); fs.writeFileSync(PID, String(process.pid)); log('daemon 開始'); run(); };
+probe.on('error', start);
+probe.on('timeout', start);
